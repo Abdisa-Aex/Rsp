@@ -956,743 +956,766 @@ export default function MessagesPage() {
     "💀",
   ];
   return (
-    <div
-      className={`min-h-screen ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}
-    >
-      <div className="container mx-auto px-2 py-4 max-w-7xl">
-        <div
-          className={`rounded-2xl shadow-xl overflow-hidden h-[85vh] ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}
-        >
-          <div className="flex h-full">
-            {/* ============ SIDEBAR ============ */}
-            {(!isMobileView || !activeChat) && (
-              <div
-                className={`${sidebarCollapsed ? "w-16" : "w-80"} border-r flex flex-col ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
-              >
-                {/* Header */}
-                <div className="p-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => router.back()}
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        <ArrowLeft className="h-5 w-5" />
-                      </button>
-                      <h2 className="text-xl font-bold">Messages</h2>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        {sidebarCollapsed ? (
-                          <Sidebar className="h-5 w-5" />
-                        ) : (
-                          <SidebarClose className="h-5 w-5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setShowSettings(true)}
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        <Settings className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setTheme(theme === "dark" ? "light" : "dark")
-                        }
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        {theme === "dark" ? (
-                          <Sun className="h-5 w-5" />
-                        ) : (
-                          <Moon className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Search */}
-                <div className="p-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search conversations..."
-                      className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Connection Status */}
-                <div className="px-3 pb-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div
-                      className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
-                    />
-                    <span className="text-gray-500">
-                      {isConnected ? "Connected" : "Reconnecting..."}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Conversation List */}
-                <div className="flex-1 overflow-y-auto">
-                  {filteredConversations.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Search className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">No conversations found</p>
-                      <button
-                        onClick={() => router.push("/messages/new")}
-                        className="mt-4 text-green-600 text-sm hover:text-green-700"
-                      >
-                        Start a new chat
-                      </button>
-                    </div>
-                  ) : (
-                    filteredConversations.map((conv) => (
-                      <button
-                        key={conv._id}
-                        onClick={() => {
-                          setActiveChat(conv);
-                          loadMessages(conv._id);
-                          if (isMobileView) setActiveChat(conv);
-                        }}
-                        className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${activeChat?._id === conv._id ? "bg-green-50 border-l-4 border-green-500" : ""}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white font-bold">
-                            {conv.otherParticipant?.fullName?.charAt(0) || "U"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start">
-                              <p className="font-medium truncate">
-                                {conv.otherParticipant?.fullName}
-                              </p>
-                              <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
-                                {conv.lastMessageAt
-                                  ? format(
-                                      parseISO(conv.lastMessageAt),
-                                      "h:mm a",
-                                    )
-                                  : ""}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-500 truncate">
-                              {conv.lastMessageText || "No messages"}
-                            </p>
-                          </div>
-                          {conv.unreadCount > 0 && (
-                            <span className="bg-green-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
-                              {conv.unreadCount}
-                            </span>
+    <>
+    <AnnouncementBar/>
+              <Header />
+      <div
+        className={`min-h-screen ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}
+      >
+        <div className="container mx-auto px-2 py-4 max-w-7xl">
+          <div
+            className={`rounded-2xl shadow-xl overflow-hidden h-[85vh] ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}
+          >
+            <div className="flex h-full">
+              {/* ============ SIDEBAR ============ */}
+              {(!isMobileView || !activeChat) && (
+                <div
+                  className={`${sidebarCollapsed ? "w-16" : "w-80"} border-r flex flex-col ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
+                >
+                  {/* Header */}
+                  <div className="p-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => router.back()}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <ArrowLeft className="h-5 w-5" />
+                        </button>
+                        <h2 className="text-xl font-bold">Messages</h2>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          {sidebarCollapsed ? (
+                            <Sidebar className="h-5 w-5" />
+                          ) : (
+                            <SidebarClose className="h-5 w-5" />
                           )}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePinConversation(conv._id);
-                              }}
-                              className="p-1 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Pin
-                                className={`h-3 w-3 ${conv.pinned ? "text-green-500 fill-green-500" : "text-gray-400"}`}
-                              />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleMuteConversation(conv._id);
-                              }}
-                              className="p-1 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              {conv.muted ? (
-                                <VolumeX className="h-3 w-3 text-gray-400" />
-                              ) : (
-                                <Volume2 className="h-3 w-3 text-gray-400" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ============ CHAT AREA ============ */}
-            {activeChat ? (
-              <div className="flex-1 flex flex-col min-w-0">
-                {/* Chat Header */}
-                <div className="p-4 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {isMobileView && (
-                      <button
-                        onClick={() => setActiveChat(null)}
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-                    )}
-                    {!isMobileView && sidebarCollapsed && (
-                      <button
-                        onClick={() => setSidebarCollapsed(false)}
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        <Sidebar className="h-5 w-5" />
-                      </button>
-                    )}
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white font-bold">
-                      {activeChat.otherParticipant?.fullName?.charAt(0) || "U"}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">
-                        {activeChat.otherParticipant?.fullName}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {activeChat.resource?.title}
-                      </p>
+                        </button>
+                        <button
+                          onClick={() => setShowSettings(true)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <Settings className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setTheme(theme === "dark" ? "light" : "dark")
+                          }
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          {theme === "dark" ? (
+                            <Sun className="h-5 w-5" />
+                          ) : (
+                            <Moon className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {/* Search in Chat - Add this near the header buttons */}
+
+                  {/* Search */}
+                  <div className="p-3">
                     <div className="relative">
-                      <button
-                        onClick={() => setShowSearchResults(!showSearchResults)}
-                        className="p-2 rounded-lg hover:bg-gray-100"
-                      >
-                        <Search className="h-5 w-5 text-gray-500" />
-                      </button>
-
-                      {showSearchResults && (
-                        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border z-20 p-3">
-                          <div className="flex gap-2 mb-3">
-                            <input
-                              type="text"
-                              value={searchInChat}
-                              onChange={(e) => setSearchInChat(e.target.value)}
-                              onKeyPress={(e) =>
-                                e.key === "Enter" && searchMessagesInChat()
-                              }
-                              placeholder="Search in conversation..."
-                              className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                            <button
-                              onClick={searchMessagesInChat}
-                              className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm"
-                            >
-                              Search
-                            </button>
-                          </div>
-
-                          {searchResults.length > 0 && (
-                            <>
-                              <div className="text-xs text-gray-500 mb-2">
-                                {searchResults.length} results
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={prevSearchResult}
-                                  disabled={currentSearchIndex <= 0}
-                                  className="flex-1 py-1 text-sm border rounded-lg disabled:opacity-50"
-                                >
-                                  Previous
-                                </button>
-                                <button
-                                  onClick={nextSearchResult}
-                                  disabled={
-                                    currentSearchIndex >=
-                                    searchResults.length - 1
-                                  }
-                                  className="flex-1 py-1 text-sm border rounded-lg disabled:opacity-50"
-                                >
-                                  Next
-                                </button>
-                              </div>
-                            </>
-                          )}
-
-                          <button
-                            onClick={clearSearch}
-                            className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600"
-                          >
-                            Clear search
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setSelectMode(!selectMode)}
-                      className={`p-2 rounded-lg ${selectMode ? "bg-green-100 text-green-600" : "hover:bg-gray-100"}`}
-                    >
-                      {selectMode ? (
-                        <CheckSquare className="h-5 w-5" />
-                      ) : (
-                        <Square className="h-5 w-5" />
-                      )}
-                    </button>
-                    <button className="p-2 rounded-lg hover:bg-gray-100">
-                      <Phone className="h-5 w-5 text-gray-500" />
-                    </button>
-                    <button className="p-2 rounded-lg hover:bg-gray-100">
-                      <Video className="h-5 w-5 text-gray-500" />
-                    </button>
-                    <button className="p-2 rounded-lg hover:bg-gray-100">
-                      <MoreVertical className="h-5 w-5 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
-                {selectMode && selectedMessagesList.length > 0 && (
-                  <div className="bg-green-50 p-3 flex justify-between items-center">
-                    <span className="text-sm text-green-700">
-                      {selectedMessagesList.length} message
-                      {selectedMessagesList.length > 1 ? "s" : ""} selected
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={selectAllMessages}
-                        className="px-3 py-1 text-sm text-green-600 hover:bg-green-100 rounded"
-                      >
-                        Select all
-                      </button>
-                      <button
-                        onClick={bulkDeleteMessages}
-                        className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={clearSelection}
-                        className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
-                      >
-                        Cancel
-                      </button>
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search conversations..."
+                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
                     </div>
                   </div>
-                )}
-                {/* Messages Container */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {groupedMessages.map((item, idx) =>
-                    item.type === "date" ? (
-                      <div key={`date-${idx}`} className="flex justify-center">
-                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-                          {item.date}
-                        </span>
+
+                  {/* Connection Status */}
+                  <div className="px-3 pb-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <div
+                        className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+                      />
+                      <span className="text-gray-500">
+                        {isConnected ? "Connected" : "Reconnecting..."}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Conversation List */}
+                  <div className="flex-1 overflow-y-auto">
+                    {filteredConversations.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <Search className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500">No conversations found</p>
+                        <button
+                          onClick={() => router.push("/messages/new")}
+                          className="mt-4 text-green-600 text-sm hover:text-green-700"
+                        >
+                          Start a new chat
+                        </button>
                       </div>
                     ) : (
-                      <div
-                        id={`message-${item.id || item._id}`}
-                        key={item.id || item._id || idx}
-                        className={`flex ${item.sender === user?._id ? "justify-end" : "justify-start"} relative group`}
-                      >
-                        {/* Selection checkbox */}
-                        {selectMode && (
-                          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -ml-8">
-                            <input
-                              type="checkbox"
-                              checked={selectedMessagesList.includes(
-                                item.id || item._id,
-                              )}
-                              onChange={() =>
-                                toggleSelectMessage(item.id || item._id)
-                              }
-                              className="w-4 h-4 rounded border-gray-300 text-green-500 focus:ring-green-500"
-                            />
-                          </div>
-                        )}
-                        {/* Three dots button - only visible on hover */}
-                        {item.sender === user?._id && (
-                          <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                            <button
-                              onClick={() =>
-                                setShowMessageActions(
-                                  showMessageActions === (item.id || item._id)
-                                    ? null
-                                    : item.id || item._id,
-                                )
-                              }
-                              className="p-1 bg-white rounded-full shadow-md hover:bg-gray-100"
-                            >
-                              <MoreVertical className="h-3 w-3 text-gray-500" />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Dropdown menu */}
-                        {showMessageActions === (item.id || item._id) && (
-                          <div className="absolute right-0 top-6 z-20 bg-white rounded-lg shadow-lg border w-44">
-                            <button
-                              onClick={() => {
-                                copyMessage(item.text);
-                                setShowMessageActions(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                            >
-                              <Copy className="h-4 w-4" /> Copy
-                            </button>
-                            <button
-                              onClick={() => {
-                                setReplyTo({
-                                  id: item.id || item._id,
-                                  text: item.text,
-                                  senderName: item.senderName,
-                                });
-                                setShowMessageActions(null);
-                              }}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                            >
-                              <Reply className="h-4 w-4" /> Reply
-                            </button>
-                            {item.sender === user?._id && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setEditMessage({
-                                      id: item.id || item._id,
-                                      text: item.text,
-                                    });
-                                    setMessageInput(item.text);
-                                    setShowMessageActions(null);
-                                    textareaRef.current?.focus();
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                                >
-                                  <EditIcon className="h-4 w-4" /> Edit
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    deleteMessage(item.id || item._id, false);
-                                    setShowMessageActions(null);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <Trash2 className="h-4 w-4" /> Delete for me
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    deleteMessage(item.id || item._id, true);
-                                    setShowMessageActions(null);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <Trash2 className="h-4 w-4" /> Delete for
-                                  everyone
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Message Bubble */}
-                        <div
-                          className={`max-w-[70%] rounded-2xl p-3 ${item.sender === user?._id ? "bg-green-500 text-white rounded-br-none" : "bg-gray-100 text-gray-900 rounded-bl-none"}`}
+                      filteredConversations.map((conv) => (
+                        <button
+                          key={conv._id}
+                          onClick={() => {
+                            setActiveChat(conv);
+                            loadMessages(conv._id);
+                            if (isMobileView) setActiveChat(conv);
+                          }}
+                          className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${activeChat?._id === conv._id ? "bg-green-50 border-l-4 border-green-500" : ""}`}
                         >
-                          {/* Reply To */}
-                          {item.replyTo && (
-                            <div className="mb-2 p-2 rounded bg-white/20 text-sm">
-                              <p className="text-xs opacity-80">
-                                Replying to {item.replyTo.senderName}
-                              </p>
-                              <p className="truncate text-sm">
-                                {item.replyTo.text}
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white font-bold">
+                              {conv.otherParticipant?.fullName?.charAt(0) ||
+                                "U"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start">
+                                <p className="font-medium truncate">
+                                  {conv.otherParticipant?.fullName}
+                                </p>
+                                <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                                  {conv.lastMessageAt
+                                    ? format(
+                                        parseISO(conv.lastMessageAt),
+                                        "h:mm a",
+                                      )
+                                    : ""}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-500 truncate">
+                                {conv.lastMessageText || "No messages"}
                               </p>
                             </div>
-                          )}
-
-                          {/* Message Text */}
-                          <p className="whitespace-pre-wrap break-words">
-                            {item.text}
-                          </p>
-
-                          {/* Reactions */}
-                          {item.reactions &&
-                            Object.keys(item.reactions).length > 0 && (
-                              <div className="flex gap-1 mt-2">
-                                {Object.entries(item.reactions).map(
-                                  ([emoji, count]) => (
-                                    <button
-                                      key={emoji}
-                                      onClick={() =>
-                                        addReaction(item.id || item._id, emoji)
-                                      }
-                                      className="text-xs bg-white/20 rounded-full px-1.5 py-0.5"
-                                    >
-                                      {emoji} {count}
-                                    </button>
-                                  ),
+                            {conv.unreadCount > 0 && (
+                              <span className="bg-green-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                                {conv.unreadCount}
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePinConversation(conv._id);
+                                }}
+                                className="p-1 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Pin
+                                  className={`h-3 w-3 ${conv.pinned ? "text-green-500 fill-green-500" : "text-gray-400"}`}
+                                />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleMuteConversation(conv._id);
+                                }}
+                                className="p-1 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                {conv.muted ? (
+                                  <VolumeX className="h-3 w-3 text-gray-400" />
+                                ) : (
+                                  <Volume2 className="h-3 w-3 text-gray-400" />
                                 )}
-                              </div>
-                            )}
-
-                          {/* Footer */}
-                          <div
-                            className={`flex justify-end items-center gap-1 mt-1 text-xs ${item.sender === user?._id ? "text-green-100" : "text-gray-400"}`}
-                          >
-                            <span>
-                              {formatMessageTime(item.createdAt || item.time)}
-                            </span>
-                            {item.sender === user?._id && (
-                              <MessageStatusIndicator
-                                status={item.status}
-                                read={item.read}
-                              />
-                            )}
-                            {item.edited && (
-                              <span className="italic">edited</span>
-                            )}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ),
-                  )}
-                  {typingUser && (
-                    <TypingIndicator name={typingUser} theme={theme} />
-                  )}
-                  <div ref={messagesEndRef} />
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
+              )}
 
-                {/* Reply Preview */}
-                {replyTo && (
-                  <div className="mx-4 mb-2 p-3 bg-gray-100 rounded-lg flex justify-between items-center">
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500">
-                        Replying to {replyTo.senderName}
-                      </p>
-                      <p className="text-sm truncate">{replyTo.text}</p>
+              {/* ============ CHAT AREA ============ */}
+              {activeChat ? (
+                <div className="flex-1 flex flex-col min-w-0">
+                  {/* Chat Header */}
+                  <div className="p-4 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {isMobileView && (
+                        <button
+                          onClick={() => setActiveChat(null)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                      )}
+                      {!isMobileView && sidebarCollapsed && (
+                        <button
+                          onClick={() => setSidebarCollapsed(false)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <Sidebar className="h-5 w-5" />
+                        </button>
+                      )}
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white font-bold">
+                        {activeChat.otherParticipant?.fullName?.charAt(0) ||
+                          "U"}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">
+                          {activeChat.otherParticipant?.fullName}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {activeChat.resource?.title}
+                        </p>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setReplyTo(null)}
-                      className="p-1 hover:bg-gray-200 rounded"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
+                    <div className="flex items-center gap-2">
+                      {/* Search in Chat - Add this near the header buttons */}
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setShowSearchResults(!showSearchResults)
+                          }
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <Search className="h-5 w-5 text-gray-500" />
+                        </button>
 
-                {/* Edit Preview */}
-                {editMessage && (
-                  <div className="mx-4 mb-2 p-3 bg-yellow-50 rounded-lg flex justify-between items-center">
-                    <div className="flex-1">
-                      <p className="text-xs text-yellow-600">Editing message</p>
-                      <p className="text-sm truncate">{editMessage.text}</p>
+                        {showSearchResults && (
+                          <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border z-20 p-3">
+                            <div className="flex gap-2 mb-3">
+                              <input
+                                type="text"
+                                value={searchInChat}
+                                onChange={(e) =>
+                                  setSearchInChat(e.target.value)
+                                }
+                                onKeyPress={(e) =>
+                                  e.key === "Enter" && searchMessagesInChat()
+                                }
+                                placeholder="Search in conversation..."
+                                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                              <button
+                                onClick={searchMessagesInChat}
+                                className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm"
+                              >
+                                Search
+                              </button>
+                            </div>
+
+                            {searchResults.length > 0 && (
+                              <>
+                                <div className="text-xs text-gray-500 mb-2">
+                                  {searchResults.length} results
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={prevSearchResult}
+                                    disabled={currentSearchIndex <= 0}
+                                    className="flex-1 py-1 text-sm border rounded-lg disabled:opacity-50"
+                                  >
+                                    Previous
+                                  </button>
+                                  <button
+                                    onClick={nextSearchResult}
+                                    disabled={
+                                      currentSearchIndex >=
+                                      searchResults.length - 1
+                                    }
+                                    className="flex-1 py-1 text-sm border rounded-lg disabled:opacity-50"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </>
+                            )}
+
+                            <button
+                              onClick={clearSearch}
+                              className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Clear search
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setSelectMode(!selectMode)}
+                        className={`p-2 rounded-lg ${selectMode ? "bg-green-100 text-green-600" : "hover:bg-gray-100"}`}
+                      >
+                        {selectMode ? (
+                          <CheckSquare className="h-5 w-5" />
+                        ) : (
+                          <Square className="h-5 w-5" />
+                        )}
+                      </button>
+                      <button className="p-2 rounded-lg hover:bg-gray-100">
+                        <Phone className="h-5 w-5 text-gray-500" />
+                      </button>
+                      <button className="p-2 rounded-lg hover:bg-gray-100">
+                        <Video className="h-5 w-5 text-gray-500" />
+                      </button>
+                      <button className="p-2 rounded-lg hover:bg-gray-100">
+                        <MoreVertical className="h-5 w-5 text-gray-500" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setEditMessage(null)}
-                      className="p-1 hover:bg-yellow-100 rounded"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
                   </div>
-                )}
-
-                {/* Input Area */}
-                <div className="p-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingFile}
-                      className="p-2 rounded-lg hover:bg-gray-100"
-                    >
-                      <Paperclip className="h-5 w-5 text-gray-500" />
-                    </button>
-                    <button
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="p-2 rounded-lg hover:bg-gray-100"
-                    >
-                      <Smile className="h-5 w-5 text-gray-500" />
-                    </button>
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={!activeChat}
-                      className={`p-2 rounded-lg transition-all duration-200 ${
-                        isRecording
-                          ? "bg-red-500 text-white animate-pulse"
-                          : "hover:bg-gray-100"
-                      }`}
-                      title={
-                        isRecording ? "Stop recording" : "Record voice message"
-                      }
-                    >
-                      {isRecording ? (
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-white rounded-full animate-ping" />
-                          <span className="text-xs">
-                            {formatRecordingTime(recordingTime)}
+                  {selectMode && selectedMessagesList.length > 0 && (
+                    <div className="bg-green-50 p-3 flex justify-between items-center">
+                      <span className="text-sm text-green-700">
+                        {selectedMessagesList.length} message
+                        {selectedMessagesList.length > 1 ? "s" : ""} selected
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={selectAllMessages}
+                          className="px-3 py-1 text-sm text-green-600 hover:bg-green-100 rounded"
+                        >
+                          Select all
+                        </button>
+                        <button
+                          onClick={bulkDeleteMessages}
+                          className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={clearSelection}
+                          className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Messages Container */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {groupedMessages.map((item, idx) =>
+                      item.type === "date" ? (
+                        <div
+                          key={`date-${idx}`}
+                          className="flex justify-center"
+                        >
+                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+                            {item.date}
                           </span>
                         </div>
                       ) : (
-                        <Mic className="h-5 w-5" />
-                      )}
-                    </button>
-                    <textarea
-                      ref={textareaRef}
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          sendMessage();
+                        <div
+                          id={`message-${item.id || item._id}`}
+                          key={item.id || item._id || idx}
+                          className={`flex ${item.sender === user?._id ? "justify-end" : "justify-start"} relative group`}
+                        >
+                          {/* Selection checkbox */}
+                          {selectMode && (
+                            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -ml-8">
+                              <input
+                                type="checkbox"
+                                checked={selectedMessagesList.includes(
+                                  item.id || item._id,
+                                )}
+                                onChange={() =>
+                                  toggleSelectMessage(item.id || item._id)
+                                }
+                                className="w-4 h-4 rounded border-gray-300 text-green-500 focus:ring-green-500"
+                              />
+                            </div>
+                          )}
+                          {/* Three dots button - only visible on hover */}
+                          {item.sender === user?._id && (
+                            <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              <button
+                                onClick={() =>
+                                  setShowMessageActions(
+                                    showMessageActions === (item.id || item._id)
+                                      ? null
+                                      : item.id || item._id,
+                                  )
+                                }
+                                className="p-1 bg-white rounded-full shadow-md hover:bg-gray-100"
+                              >
+                                <MoreVertical className="h-3 w-3 text-gray-500" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Dropdown menu */}
+                          {showMessageActions === (item.id || item._id) && (
+                            <div className="absolute right-0 top-6 z-20 bg-white rounded-lg shadow-lg border w-44">
+                              <button
+                                onClick={() => {
+                                  copyMessage(item.text);
+                                  setShowMessageActions(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                              >
+                                <Copy className="h-4 w-4" /> Copy
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setReplyTo({
+                                    id: item.id || item._id,
+                                    text: item.text,
+                                    senderName: item.senderName,
+                                  });
+                                  setShowMessageActions(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                              >
+                                <Reply className="h-4 w-4" /> Reply
+                              </button>
+                              {item.sender === user?._id && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditMessage({
+                                        id: item.id || item._id,
+                                        text: item.text,
+                                      });
+                                      setMessageInput(item.text);
+                                      setShowMessageActions(null);
+                                      textareaRef.current?.focus();
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                                  >
+                                    <EditIcon className="h-4 w-4" /> Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      deleteMessage(item.id || item._id, false);
+                                      setShowMessageActions(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete for me
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      deleteMessage(item.id || item._id, true);
+                                      setShowMessageActions(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete for
+                                    everyone
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Message Bubble */}
+                          <div
+                            className={`max-w-[70%] rounded-2xl p-3 ${item.sender === user?._id ? "bg-green-500 text-white rounded-br-none" : "bg-gray-100 text-gray-900 rounded-bl-none"}`}
+                          >
+                            {/* Reply To */}
+                            {item.replyTo && (
+                              <div className="mb-2 p-2 rounded bg-white/20 text-sm">
+                                <p className="text-xs opacity-80">
+                                  Replying to {item.replyTo.senderName}
+                                </p>
+                                <p className="truncate text-sm">
+                                  {item.replyTo.text}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Message Text */}
+                            <p className="whitespace-pre-wrap break-words">
+                              {item.text}
+                            </p>
+
+                            {/* Reactions */}
+                            {item.reactions &&
+                              Object.keys(item.reactions).length > 0 && (
+                                <div className="flex gap-1 mt-2">
+                                  {Object.entries(item.reactions).map(
+                                    ([emoji, count]) => (
+                                      <button
+                                        key={emoji}
+                                        onClick={() =>
+                                          addReaction(
+                                            item.id || item._id,
+                                            emoji,
+                                          )
+                                        }
+                                        className="text-xs bg-white/20 rounded-full px-1.5 py-0.5"
+                                      >
+                                        {emoji} {count}
+                                      </button>
+                                    ),
+                                  )}
+                                </div>
+                              )}
+
+                            {/* Footer */}
+                            <div
+                              className={`flex justify-end items-center gap-1 mt-1 text-xs ${item.sender === user?._id ? "text-green-100" : "text-gray-400"}`}
+                            >
+                              <span>
+                                {formatMessageTime(item.createdAt || item.time)}
+                              </span>
+                              {item.sender === user?._id && (
+                                <MessageStatusIndicator
+                                  status={item.status}
+                                  read={item.read}
+                                />
+                              )}
+                              {item.edited && (
+                                <span className="italic">edited</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ),
+                    )}
+                    {typingUser && (
+                      <TypingIndicator name={typingUser} theme={theme} />
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {/* Reply Preview */}
+                  {replyTo && (
+                    <div className="mx-4 mb-2 p-3 bg-gray-100 rounded-lg flex justify-between items-center">
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500">
+                          Replying to {replyTo.senderName}
+                        </p>
+                        <p className="text-sm truncate">{replyTo.text}</p>
+                      </div>
+                      <button
+                        onClick={() => setReplyTo(null)}
+                        className="p-1 hover:bg-gray-200 rounded"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Edit Preview */}
+                  {editMessage && (
+                    <div className="mx-4 mb-2 p-3 bg-yellow-50 rounded-lg flex justify-between items-center">
+                      <div className="flex-1">
+                        <p className="text-xs text-yellow-600">
+                          Editing message
+                        </p>
+                        <p className="text-sm truncate">{editMessage.text}</p>
+                      </div>
+                      <button
+                        onClick={() => setEditMessage(null)}
+                        className="p-1 hover:bg-yellow-100 rounded"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Input Area */}
+                  <div className="p-4 border-t">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingFile}
+                        className="p-2 rounded-lg hover:bg-gray-100"
+                      >
+                        <Paperclip className="h-5 w-5 text-gray-500" />
+                      </button>
+                      <button
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="p-2 rounded-lg hover:bg-gray-100"
+                      >
+                        <Smile className="h-5 w-5 text-gray-500" />
+                      </button>
+                      <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={!activeChat}
+                        className={`p-2 rounded-lg transition-all duration-200 ${
+                          isRecording
+                            ? "bg-red-500 text-white animate-pulse"
+                            : "hover:bg-gray-100"
+                        }`}
+                        title={
+                          isRecording
+                            ? "Stop recording"
+                            : "Record voice message"
                         }
-                      }}
-                      onKeyUp={handleTyping}
-                      placeholder="Type a message..."
-                      className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                      rows={1}
-                      style={{ minHeight: "40px", maxHeight: "100px" }}
-                    />
-                    <button
-                      onClick={sendMessage}
-                      disabled={!messageInput.trim() || sending}
-                      className={`p-2 rounded-lg ${messageInput.trim() && !sending ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}
-                    >
-                      {sending ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Send className="h-5 w-5" />
-                      )}
-                    </button>
+                      >
+                        {isRecording ? (
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                            <span className="text-xs">
+                              {formatRecordingTime(recordingTime)}
+                            </span>
+                          </div>
+                        ) : (
+                          <Mic className="h-5 w-5" />
+                        )}
+                      </button>
+                      <textarea
+                        ref={textareaRef}
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage();
+                          }
+                        }}
+                        onKeyUp={handleTyping}
+                        placeholder="Type a message..."
+                        className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                        rows={1}
+                        style={{ minHeight: "40px", maxHeight: "100px" }}
+                      />
+                      <button
+                        onClick={sendMessage}
+                        disabled={!messageInput.trim() || sending}
+                        className={`p-2 rounded-lg ${messageInput.trim() && !sending ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}
+                      >
+                        {sending ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Send className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <EmptyState
-                theme={theme}
-                onNewChat={() => router.push("/messages/new")}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div
-            className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}
-          >
-            <div className="p-6 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold">Chat Settings</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span>Dark Mode</span>
-                <button
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className={`w-12 h-6 rounded-full transition-colors ${theme === "dark" ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full transform transition-transform mt-0.5 ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Show Timestamps</span>
-                <button
-                  onClick={() => setShowTimestamps(!showTimestamps)}
-                  className={`w-12 h-6 rounded-full transition-colors ${showTimestamps ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full transform transition-transform mt-0.5 ${showTimestamps ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Read Receipts</span>
-                <button
-                  onClick={() => setShowReadReceipts(!showReadReceipts)}
-                  className={`w-12 h-6 rounded-full transition-colors ${showReadReceipts ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full transform transition-transform mt-0.5 ${showReadReceipts ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-            </div>
-            <div className="p-6 border-t">
-              <button
-                onClick={() => setShowSettings(false)}
-                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-medium"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        onChange={() => {}}
-        className="hidden"
-        accept="image/*,video/*,application/pdf,.doc,.docx,.mp3,.wav"
-      />
-      {/* Forward Modal */}
-      {showForwardModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h3 className="text-xl font-bold">Forward Message</h3>
-              <button
-                onClick={() => setShowForwardModal(false)}
-                className="p-2 hover:bg-gray-100 rounded"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">
-                  Search users
-                </label>
-                <input
-                  type="text"
-                  value={forwardToUser}
-                  onChange={(e) => {
-                    setForwardToUser(e.target.value);
-                    searchUsersToForward(e.target.value);
-                  }}
-                  placeholder="Type user name..."
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+              ) : (
+                <EmptyState
+                  theme={theme}
+                  onNewChat={() => router.push("/messages/new")}
                 />
-              </div>
-
-              {forwardSearchResults.length > 0 && (
-                <div className="max-h-64 overflow-y-auto space-y-2">
-                  {forwardSearchResults.map((user) => (
-                    <button
-                      key={user._id}
-                      onClick={() => forwardToConversation(user._id)}
-                      className="w-full p-3 text-left hover:bg-gray-50 rounded-lg flex items-center gap-3"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white">
-                        {user.fullName?.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-medium">{user.fullName}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
               )}
             </div>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div
+              className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}
+            >
+              <div className="p-6 border-b flex justify-between items-center">
+                <h2 className="text-xl font-bold">Chat Settings</h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>Dark Mode</span>
+                  <button
+                    onClick={() =>
+                      setTheme(theme === "dark" ? "light" : "dark")
+                    }
+                    className={`w-12 h-6 rounded-full transition-colors ${theme === "dark" ? "bg-green-500" : "bg-gray-300"}`}
+                  >
+                    <div
+                      className={`w-5 h-5 bg-white rounded-full transform transition-transform mt-0.5 ${theme === "dark" ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Show Timestamps</span>
+                  <button
+                    onClick={() => setShowTimestamps(!showTimestamps)}
+                    className={`w-12 h-6 rounded-full transition-colors ${showTimestamps ? "bg-green-500" : "bg-gray-300"}`}
+                  >
+                    <div
+                      className={`w-5 h-5 bg-white rounded-full transform transition-transform mt-0.5 ${showTimestamps ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Read Receipts</span>
+                  <button
+                    onClick={() => setShowReadReceipts(!showReadReceipts)}
+                    className={`w-12 h-6 rounded-full transition-colors ${showReadReceipts ? "bg-green-500" : "bg-gray-300"}`}
+                  >
+                    <div
+                      className={`w-5 h-5 bg-white rounded-full transform transition-transform mt-0.5 ${showReadReceipts ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 border-t">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-medium"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={() => {}}
+          className="hidden"
+          accept="image/*,video/*,application/pdf,.doc,.docx,.mp3,.wav"
+        />
+        {/* Forward Modal */}
+        {showForwardModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="p-6 border-b flex justify-between items-center">
+                <h3 className="text-xl font-bold">Forward Message</h3>
+                <button
+                  onClick={() => setShowForwardModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Search users
+                  </label>
+                  <input
+                    type="text"
+                    value={forwardToUser}
+                    onChange={(e) => {
+                      setForwardToUser(e.target.value);
+                      searchUsersToForward(e.target.value);
+                    }}
+                    placeholder="Type user name..."
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                {forwardSearchResults.length > 0 && (
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {forwardSearchResults.map((user) => (
+                      <button
+                        key={user._id}
+                        onClick={() => forwardToConversation(user._id)}
+                        className="w-full p-3 text-left hover:bg-gray-50 rounded-lg flex items-center gap-3"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white">
+                          {user.fullName?.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium">{user.fullName}</p>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+        <Footer />
+    </>
   );
 }

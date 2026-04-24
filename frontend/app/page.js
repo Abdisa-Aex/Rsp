@@ -249,7 +249,6 @@ const FeaturedResources = () => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
-  
 
   useEffect(() => {
     loadFeaturedResources();
@@ -810,7 +809,6 @@ const Categories = () => {
 const RecentActivity = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
- 
 
   useEffect(() => {
     loadActivities();
@@ -961,7 +959,6 @@ const Testimonials = () => {
   const [testimonials, setTestimonials] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
- 
 
   useEffect(() => {
     loadTestimonials();
@@ -980,7 +977,7 @@ const Testimonials = () => {
         {
           _id: "1",
           user: {
-            fullName: "Sarah Johnson",
+            fullName: "Sultan ",
             role: "DIY Enthusiast",
             avatar: "SJ",
           },
@@ -992,7 +989,7 @@ const Testimonials = () => {
         },
         {
           _id: "2",
-          user: { fullName: "Michael Brown", role: "Homeowner", avatar: "MB" },
+          user: { fullName: "Abdisa Alex", role: "Homeowner", avatar: "MB" },
           rating: 5,
           content:
             "I shared my lawn mower and it helped three neighbors in just one month. Great way to build community and reduce waste.",
@@ -1001,7 +998,25 @@ const Testimonials = () => {
         },
         {
           _id: "3",
-          user: { fullName: "Emma Davis", role: "Student", avatar: "ED" },
+          user: { fullName: "Abenezer  ", role: "Student", avatar: "ED" },
+          rating: 4,
+          content:
+            "Borrowed textbooks for my semester and saved over $300. The platform is easy to use and the community is very responsive.",
+          resource: { title: "College Textbooks" },
+          createdAt: new Date().toISOString(),
+        },
+        {
+          _id: "3",
+          user: { fullName: "Seid  ", role: "Student", avatar: "ED" },
+          rating: 4,
+          content:
+            "Borrowed textbooks for my semester and saved over $300. The platform is easy to use and the community is very responsive.",
+          resource: { title: "College Textbooks" },
+          createdAt: new Date().toISOString(),
+        },
+        {
+          _id: "3",
+          user: { fullName: "Hosama  ", role: "Student", avatar: "ED" },
           rating: 4,
           content:
             "Borrowed textbooks for my semester and saved over $300. The platform is easy to use and the community is very responsive.",

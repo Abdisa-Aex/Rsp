@@ -249,7 +249,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Login - UPDATED WITH COOKIES
+  // Login - UPDATED WITH COOKIES (FIXED)
   const login = async (email, password, rememberMe = false) => {
     try {
       const data = await apiCall("/auth/login", {
@@ -271,8 +271,10 @@ export function AuthProvider({ children }) {
         setToken(data.token);
         setRefreshToken(data.refreshToken);
         setUser(data.user);
+
         localStorage.setItem("token", data.token);
         localStorage.setItem("refreshToken", data.refreshToken);
+        localStorage.setItem("user", JSON.stringify(data.user)); // ✅ FIXED: use data.user
 
         // ADD COOKIES FOR MIDDLEWARE
         setCookie("token", data.token);

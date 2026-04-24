@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  // Package,
   Handshake,
   RotateCcw,
   Star,
@@ -13,13 +12,11 @@ import {
   DollarSign,
   MessageCircle,
   Eye,
-  MoreVertical,
   CheckCircle,
   XCircle,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
+import toast from "react-hot-toast"; 
 import { Package } from "lucide-react";
 import Button from "components/ui/Button";
 import Badge from "components/ui/Badge";
@@ -34,7 +31,44 @@ const ExchangesList = ({
   onRate,
 }) => {
   const [expandedId, setExpandedId] = useState(null);
-  
+
+  // Transform exchanges to expected format if needed
+  const normalizeExchange = (exchange) => {
+    return {
+      id: exchange.id || exchange._id,
+      // Map 'lent' to 'lend' for display consistency
+      type:
+        exchange.type === "lent"
+          ? "lend"
+          : exchange.type === "borrowed"
+            ? "borrow"
+            : exchange.type,
+      resourceTitle:
+        exchange.resource?.title || exchange.title || "Unknown Item",
+      resourceDescription: exchange.resource?.description || "",
+      resourceId: exchange.resource?.id || exchange.resourceId,
+      location:
+        exchange.resource?.location || exchange.location || "Not specified",
+      partner: exchange.partner || {
+        fullName: exchange.otherUser?.fullName || "Unknown User",
+      },
+      startDate: exchange.startDate,
+      endDate: exchange.endDate,
+      duration:
+        exchange.duration ||
+        Math.ceil(
+          (new Date(exchange.endDate) - new Date(exchange.startDate)) /
+            (1000 * 60 * 60 * 24),
+        ),
+      status: exchange.status,
+      totalAmount: exchange.totalAmount || 0,
+      rated: exchange.rated || false,
+      lastMessage: exchange.lastMessage || null,
+      conversationId: exchange.conversationId || exchange._id,
+    };
+  };
+
+  const normalizedExchanges = exchanges.map(normalizeExchange);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -70,18 +104,18 @@ const ExchangesList = ({
     }
   };
 
-  const filteredExchanges = exchanges.filter((exchange) => {
-    if (filter === "all") return true;
-    return exchange.status === filter;
-  });
-
-  const filters = [
+  const filterOptions = [
     { id: "all", label: "All" },
     { id: "active", label: "Active" },
     { id: "pending", label: "Pending" },
     { id: "completed", label: "Completed" },
     { id: "canceled", label: "Canceled" },
   ];
+
+  const filteredExchanges = normalizedExchanges.filter((exchange) => {
+    if (filter === "all") return true;
+    return exchange.status === filter;
+  });
 
   if (exchanges.length === 0) {
     return (
@@ -106,18 +140,11 @@ const ExchangesList = ({
   return (
     <div>
       {/* Filters */}
-
       <div className="flex flex-wrap gap-2 mb-6">
-        {[
-          { id: "all", label: "All" },
-          { id: "active", label: "Active" },
-          { id: "pending", label: "Pending" },
-          { id: "completed", label: "Completed" },
-          { id: "canceled", label: "Canceled" },
-        ].map((f) => (
+        {filterOptions.map((f) => (
           <button
             key={f.id}
-            onClick={() => onFilterChange(f.id)}
+            onClick={() => onFilterChange?.(f.id)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
               filter === f.id
                 ? "bg-green-500 text-white"
@@ -156,7 +183,8 @@ const ExchangesList = ({
                     <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center gap-1">
                         <User className="h-3 w-3" />
-                        {exchange.type === "borrow"
+                        {exchange.type === "borrow" ||
+                        exchange.type === "borrowed"
                           ? `From: ${exchange.partner?.fullName || "Unknown"}`
                           : `To: ${exchange.partner?.fullName || "Unknown"}`}
                       </div>
@@ -199,7 +227,8 @@ const ExchangesList = ({
                   <div>
                     <p className="text-xs text-gray-500">Item Details</p>
                     <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                      {exchange.resourceDescription}
+                      {exchange.resourceDescription ||
+                        "No description provided"}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <MapPin className="h-3 w-3 text-gray-400" />
@@ -257,78 +286,84 @@ const ExchangesList = ({
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-3 mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                   {/* APPROVE/DECLINE BUTTONS FOR PENDING REQUESTS */}
-                  {exchange.status === "pending" &&
-                    exchange.type === "borrow" && (
-                      <>
-                        <Button
-                          variant="primary"
-                          size="small"
-                          onClick={() => onApprove?.(exchange)}
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="small"
-                          onClick={() => onDecline?.(exchange)}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Decline
-                        </Button>
-                      </>
-                    )}
-
+                  {exchange.status === "pending" && onApprove && onDecline && (
+                    <>
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onClick={() => onApprove(exchange)}
+                        className="bg-green-500 hover:bg-green-600"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Approve
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="small"
+                        onClick={() => onDecline(exchange)}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Decline
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     size="small"
                     onClick={() => {
                       const conversationId =
-                        exchange.conversationId || exchange._id;
+                        exchange.conversationId || exchange.id || exchange._id;
                       if (conversationId && conversationId !== "undefined") {
                         window.location.href = `/messages/${conversationId}`;
                       } else {
                         console.error("No conversation ID found", exchange);
+                        toast.error("Cannot open conversation");
                       }
                     }}
                   >
                     <MessageCircle className="h-4 w-4 mr-1" />
                     Message
                   </Button>
-
-                  {exchange.status === "active" && (
+                 
+                 
+                  {exchange.status === "active" && onReturn && (
                     <Button
                       variant="primary"
                       size="small"
-                      onClick={() => onReturn(exchange)}
+                      onClick={() => {
+                        console.log("Return clicked, exchange:", exchange);
+                        // Make sure exchange has an id
+                        if (!exchange.id && !exchange._id) {
+                          console.error("Exchange has no ID!", exchange);
+                          toast.error("Cannot return: Exchange ID missing");
+                          return;
+                        }
+                        onReturn(exchange);
+                      }}
                     >
                       <RotateCcw className="h-4 w-4 mr-1" />
                       Return Item
                     </Button>
                   )}
-
-                  {exchange.status === "completed" && !exchange.rated && (
-                    <Button
-                      variant="primary"
-                      size="small"
-                      onClick={() => onRate(exchange)}
-                    >
-                      <Star className="h-4 w-4 mr-1" />
-                      Rate Experience
-                    </Button>
-                  )}
-
+                  {exchange.status === "completed" &&
+                    !exchange.rated &&
+                    onRate && (
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onClick={() => onRate(exchange)}
+                      >
+                        <Star className="h-4 w-4 mr-1" />
+                        Rate Experience
+                      </Button>
+                    )}
                   <Button
                     variant="outline"
                     size="small"
                     onClick={() => {
-                      const resourceId =
-                        exchange.resource?._id ||
-                        exchange.resourceId ||
-                        exchange.resource;
+                      const resourceId = exchange.resourceId;
                       if (resourceId && resourceId !== "undefined") {
                         window.location.href = `/resources/${resourceId}`;
                       } else {
@@ -359,5 +394,3 @@ const ExchangesList = ({
 };
 
 export default ExchangesList;
-
-

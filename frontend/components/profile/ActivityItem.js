@@ -13,18 +13,30 @@ import {
 } from "lucide-react";
 
 const ActivityItem = ({ activity }) => {
-  // Map backend 'action' to component 'type'
+  // Map backend 'action' or 'type' to component 'type'
+  const getActivityType = () => {
+    // Try 'action' first (from new API), fallback to 'type' (from old API)
+    return activity.action || activity.type;
+  };
+
   const getIcon = () => {
-    switch (
-      activity.action // ← FIXED: use 'action' not 'type'
-    ) {
+    const type = getActivityType();
+    switch (type) {
       case "shared":
         return Package;
+      case "share":
+        return Package; // Alternative naming
       case "borrowed":
-        return Heart; // ← Heart for borrowed items
+        return Heart;
+      case "borrow":
+        return Heart; // Alternative naming
       case "returned":
         return RotateCcw;
+      case "return":
+        return RotateCcw;
       case "reviewed":
+        return Star;
+      case "review":
         return Star;
       case "joined":
         return Users;
@@ -36,16 +48,19 @@ const ActivityItem = ({ activity }) => {
   };
 
   const getColor = () => {
-    switch (
-      activity.action // ← FIXED: use 'action' not 'type'
-    ) {
+    const type = getActivityType();
+    switch (type) {
       case "shared":
+      case "share":
         return "from-green-500 to-emerald-600";
       case "borrowed":
+      case "borrow":
         return "from-blue-500 to-cyan-600";
       case "returned":
+      case "return":
         return "from-purple-500 to-pink-600";
       case "reviewed":
+      case "review":
         return "from-yellow-500 to-orange-600";
       case "joined":
         return "from-indigo-500 to-purple-600";
@@ -57,31 +72,40 @@ const ActivityItem = ({ activity }) => {
   };
 
   const getActionText = () => {
-    switch (activity.action) {
+    const type = getActivityType();
+    switch (type) {
       case "shared":
+      case "share":
         return "shared";
       case "borrowed":
+      case "borrow":
         return "borrowed";
       case "returned":
+      case "return":
         return "returned";
       case "reviewed":
+      case "review":
         return "reviewed";
       case "joined":
         return "joined";
       case "messaged":
         return "messaged";
       default:
-        return activity.action || "interacted with";
+        return "interacted with";
     }
   };
 
   const Icon = getIcon();
 
   // Handle different field names from backend
-  const userName = activity.user || activity.otherUser || "Someone";
+  const userName =
+    activity.user || activity.otherUser || activity.userName || "Someone";
   const actionText = getActionText();
-  const itemName = activity.item || "an item";
-  const timeDisplay = activity.time || activity.timeAgo || "recently";
+  const itemName = activity.item || activity.title || "an item";
+  const timeDisplay =
+    activity.time || activity.timeAgo || activity.createdAt
+      ? new Date(activity.createdAt).toLocaleDateString()
+      : "recently";
 
   return (
     <div className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-all group">

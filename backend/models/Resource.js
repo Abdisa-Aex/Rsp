@@ -8,7 +8,7 @@ const {
   RESOURCE_CONDITIONS,
   PRICE_TYPES,
 } = require("../config/constants");
-const Exchange = mongoose.model("Exchange");
+
 const ResourceSchema = new mongoose.Schema(
   {
     // Basic Information
@@ -349,7 +349,7 @@ ResourceSchema.methods.isAvailableForDates = async function (
 ) {
   if (this.status !== RESOURCE_STATUS.AVAILABLE) return false;
 
-  const Exchange = mongoose.model("Exchange");
+  const Exchange = mongoose.model("Exchange"); // ✅ Keep this
   const overlappingExchanges = await Exchange.findOne({
     resource: this._id,
     status: { $in: ["approved", "active"] },
@@ -394,7 +394,9 @@ ResourceSchema.methods.calculatePrice = function (days) {
 // Update trending status
 ResourceSchema.methods.updateTrending = async function () {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const recentRequests = await mongoose.model("Exchange").countDocuments({
+  const Exchange = mongoose.model("Exchange"); // ✅ Add this line
+  const recentRequests = await Exchange.countDocuments({
+    // ✅ Use Exchange
     resource: this._id,
     createdAt: { $gte: weekAgo },
   });
@@ -408,7 +410,6 @@ ResourceSchema.methods.updateTrending = async function () {
 
   return this.isTrending;
 };
-
 // Get similar resources
 ResourceSchema.methods.getSimilarResources = async function (limit = 5) {
   const Resource = mongoose.model("Resource");
@@ -436,5 +437,6 @@ ResourceSchema.methods.restore = async function () {
   this.deletedAt = null;
   await this.save();
 };
-
+ResourceSchema.set("toJSON", { virtuals: false });
+ResourceSchema.set("toObject", { virtuals: false });
 module.exports = mongoose.model("Resource", ResourceSchema);

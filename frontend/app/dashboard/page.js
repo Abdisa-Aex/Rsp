@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/hooks";
 import { useNotifications } from "@/hooks";
 import { useLocalStorage } from "@/hooks";
+import { QrReader } from "react-qr-reader";
 import { useDebounce } from "@/hooks";
 import {
   LayoutDashboard,
@@ -22,7 +23,6 @@ import {
   LogOut,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
   Plus,
   Star,
   QrCode,
@@ -48,7 +48,6 @@ import {
   List,
   X,
   Calendar,
-  Facebook,
   Check,
   Upload,
   Sparkle,
@@ -58,7 +57,6 @@ import {
   Download,
   Trash,
   Trash2,
-  Zap,
   Database,
   Palette,
   Download as DownloadIcon,
@@ -69,9 +67,9 @@ import {
   CheckSquare,
   Coins,
   Leaf,
-  Twitter,
   Copy,
 } from "lucide-react";
+import Facebook from "react-feather";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import AnnouncementBar from "@/components/layout/AnnouncementBar";
@@ -2637,38 +2635,60 @@ const ShareModal = ({ isOpen, onClose, item, onShare }) => {
   );
 };
 
-const ScanQRModal = ({ isOpen, onClose, onScan }) => {
-  const [scanning, setScanning] = useState(false);
+const ScanQRModal = ({ isOpen, onClose, onScan, items = [] }) => {
+  const [scanning, setScanning] = useState(true);
   const [scannedData, setScannedData] = useState(null);
-  const [scanProgress, setScanProgress] = useState(0);
-  const handleScan = async () => {
-    setScanning(true);
-    setScanProgress(0);
-    for (let i = 0; i <= 100; i += 20) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      setScanProgress(i);
-    }
-    setTimeout(() => {
-      setScannedData({
-        item: "Calculus Textbook",
-        owner: "Alex Chen",
-        location: "Library",
-        id: "item123",
-        status: "Available",
-      });
+
+  const handleScan = (result) => {
+    if (result) {
       setScanning(false);
-    }, 500);
+      try {
+        const data = JSON.parse(result?.text);
+        setScannedData({
+          item: data.title || data.item,
+          owner: data.owner,
+          location: data.location,
+          id: data.id,
+          status: data.status || "Available",
+        });
+      } catch (error) {
+        // Try to find item by ID in passed items
+        const item = items.find((i) => i._id === result?.text);
+        if (item) {
+          setScannedData({
+            item: item.title,
+            owner: item.owner?.fullName || "Unknown",
+            location: item.location,
+            id: item._id,
+            status: item.status,
+          });
+        } else {
+          toast.error("Invalid QR code");
+          setScanning(true);
+        }
+      }
+    }
   };
+
+  const handleError = (error) => {
+    console.error("QR Scanner error:", error);
+    toast.error("Camera access denied or unavailable");
+  };
+
   const confirmScan = () => {
-    onScan(scannedData);
-    onClose();
+    if (scannedData) {
+      onScan(scannedData);
+      onClose();
+    }
   };
+
   const resetScan = () => {
     setScannedData(null);
-    setScanning(false);
-    setScanProgress(0);
+    setScanning(true);
   };
+
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
@@ -2683,40 +2703,44 @@ const ScanQRModal = ({ isOpen, onClose, onScan }) => {
             <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
+
         <div className="text-center space-y-4">
-          {!scanning && !scannedData && (
+          {scanning && !scannedData && (
             <>
-              <div className="w-48 h-48 mx-auto bg-gray-200 dark:bg-gray-700 rounded-xl flex items-center justify-center">
-                <QrCode className="h-16 w-16 text-gray-400" />
+              <div className="w-64 h-64 mx-auto overflow-hidden rounded-xl">
+                <QrReader
+                  onResult={handleScan}
+                  onError={handleError}
+                  constraints={{ facingMode: "environment" }}
+                  containerStyle={{ width: "100%", height: "100%" }}
+                  videoStyle={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
               </div>
               <p className="text-sm text-gray-600">
                 Position the QR code within the frame
               </p>
+            </>
+          )}
+
+          {!scanning && !scannedData && (
+            <>
+              <div className="w-48 h-48 mx-auto bg-gray-200 dark:bg-gray-700 rounded-xl flex items-center justify-center">
+                <AlertCircle className="h-16 w-16 text-red-400" />
+              </div>
+              <p className="text-sm text-red-600">Failed to scan QR code</p>
               <button
-                onClick={handleScan}
+                onClick={() => setScanning(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 w-full"
               >
-                Start Scanning
+                Try Again
               </button>
             </>
           )}
-          {scanning && !scannedData && (
-            <>
-              <div className="w-48 h-48 mx-auto bg-gray-900 rounded-xl flex items-center justify-center relative">
-                <Camera className="h-16 w-16 text-white animate-pulse" />
-                <div className="absolute inset-0 border-2 border-green-500 rounded-xl animate-ping" />
-              </div>
-              <p className="text-sm text-gray-600">
-                Scanning... {scanProgress}%
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${scanProgress}%` }}
-                />
-              </div>
-            </>
-          )}
+
           {scannedData && (
             <>
               <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -4007,56 +4031,118 @@ function DashboardPage() {
   };
 
   const handleRequestItem = async (item, requestData) => {
+    if (!item || !item._id) {
+      showToast("Invalid item", "error");
+      return;
+    }
+
     try {
+      // Calculate end date from duration
+      const startDate = new Date(requestData.pickupDate);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + requestData.duration);
+
       const response = await apiCall(`/resources/${item._id}/request`, {
         method: "POST",
         body: JSON.stringify({
-          startDate: requestData.pickupDate,
-          endDate: requestData.pickupDate,
-          message: requestData.message,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          message: requestData.message || "",
         }),
       });
+
       if (response.success) {
         showToast("Request sent successfully!", "success");
         loadDashboardData();
         closeModal("requestItem");
+        closeModal("viewItem");
+      } else {
+        showToast(response.message || "Failed to send request", "error");
       }
     } catch (error) {
+      console.error("Request error:", error);
       showToast(error.message || "Failed to send request", "error");
     }
   };
 
-  const handleReturnItem = async (exchange) => {
+  const handleReturnItem = async (exchange, returnData) => {
+    if (!exchange || !exchange.id) {
+      showToast("Invalid exchange", "error");
+      return;
+    }
+
     try {
-      const response = await apiCall(`/exchanges/${exchange.id}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status: "completed" }),
+      const response = await apiCall(`/exchanges/${exchange.id}/return`, {
+        method: "POST",
+        body: JSON.stringify({
+          condition: returnData.condition || "Good",
+          returnNotes: returnData.notes || "",
+          returnPhotos: returnData.photos || [],
+        }),
       });
+
       if (response.success) {
-        showToast("Item returned successfully!", "success");
+        showToast("Item returned successfully! +100 points", "success");
         loadDashboardData();
         closeModal("returnItem");
+      } else {
+        showToast(response.message || "Failed to return item", "error");
       }
     } catch (error) {
+      console.error("Return error:", error);
       showToast(error.message || "Failed to return item", "error");
     }
   };
 
-  const handleRateItem = async (item, ratingData) => {
+  const handleUpdateProfile = async (formData) => {
     try {
-      const response = await apiCall(`/exchanges/${item._id}/complete`, {
+      const response = await apiCall("/users/me", {
+        method: "PUT",
+        body: JSON.stringify({
+          fullName: formData.name,
+          phone: formData.phone,
+          location: formData.location,
+          bio: formData.bio,
+        }),
+      });
+
+      if (response.success) {
+        showToast("Profile updated successfully!", "success");
+        loadDashboardData();
+      } else {
+        showToast(response.message || "Failed to update profile", "error");
+      }
+    } catch (error) {
+      showToast(error.message || "Failed to update profile", "error");
+    }
+  };
+
+  const handleRateItem = async (item, ratingData) => {
+    if (!item || !item._id) {
+      showToast("Invalid exchange", "error");
+      return;
+    }
+
+    try {
+      const response = await apiCall(`/exchanges/${item._id}/rate`, {
         method: "POST",
         body: JSON.stringify({
           rating: ratingData.rating,
           review: ratingData.review,
+          tags: ratingData.tags || [],
+          isPublic: true,
         }),
       });
+
       if (response.success) {
-        showToast("Rating submitted successfully!", "success");
+        showToast("Rating submitted successfully! +50 points", "success");
         loadDashboardData();
         closeModal("rateItem");
+      } else {
+        showToast(response.message || "Failed to submit rating", "error");
       }
     } catch (error) {
+      console.error("Rate error:", error);
       showToast(error.message || "Failed to submit rating", "error");
     }
   };
@@ -4129,8 +4215,10 @@ function DashboardPage() {
     try {
       await apiCall(`/notifications/${id}`, { method: "DELETE" });
       setNotificationsData((prev) => prev.filter((n) => n._id !== id));
+      showToast("Notification deleted", "info");
     } catch (error) {
       console.error("Delete error:", error);
+      showToast("Failed to delete notification", "error");
     }
   };
 
@@ -4392,7 +4480,7 @@ function DashboardPage() {
         <Toaster position="top-right" />
         <AnnouncementBar />
         <Header />
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 pt-20">
+        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 pt-0">
           {/* ============ SIDEBAR (Keep your existing sidebar UI) ============ */}
           <aside
             className={`${sidebarCollapsed ? "w-20" : "w-72"} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col shadow-xl z-20`}
@@ -5432,6 +5520,7 @@ function DashboardPage() {
         isOpen={modals.scanQR}
         onClose={() => closeModal("scanQR")}
         onScan={handleQRScan}
+        items={myItems}
       />
       <ViewItemModal
         isOpen={modals.viewItem}

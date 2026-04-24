@@ -172,6 +172,22 @@ router.get(
   validate,
   safeHandler(userController.getUserActivities, "getUserActivities"),
 );
+
+router.get(
+  "/me/export-all",
+  auth,
+  safeHandler(userController.exportAllData, "exportAllData"),
+);
+router.post(
+  "/me/import",
+  auth,
+  safeHandler(userController.importData, "importData"),
+);
+router.delete(
+  "/me/reset",
+  auth,
+  safeHandler(userController.resetUserData, "resetUserData"),
+);
 router.post(
   "/:userId/block",
   auth,

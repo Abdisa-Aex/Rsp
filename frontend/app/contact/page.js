@@ -16,9 +16,7 @@ import {
   Star,
   Handshake,
 } from "lucide-react";
-// import Header from "../../components/layout/Header";
-// import Footer from "../../components/layout/Footer";
-// import AnnouncementBar from "../../components/layout/AnnouncementBar";
+
 import { User } from "lucide-react";
 import { Youtube } from "react-feather";
 import { Linkedin } from "react-feather";

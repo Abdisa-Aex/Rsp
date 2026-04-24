@@ -232,7 +232,8 @@ const NotificationItem = ({
                 <div className="flex items-center gap-4 mt-2">
                   <span className="text-xs text-gray-400 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {getTimeAgo(notification.time)}
+                    {/* {getTimeAgo(notification.time)} */}
+                    {getTimeAgo(notification.createdAt || notification.time)}
                   </span>
                   {notification.actionUrl && (
                     <Link

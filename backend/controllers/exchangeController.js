@@ -71,7 +71,7 @@ exports.getExchangeById = async (req, res) => {
 exports.updateExchangeStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const exchange = await Exchange.findById(req.params.id);
+    const exchange = await Exchange.findById(req.params.id).populate("resource", "title");
 
     if (!exchange) {
       return res
@@ -79,14 +79,52 @@ exports.updateExchangeStatus = async (req, res) => {
         .json({ success: false, message: "Exchange not found" });
     }
 
-    // Only owner can approve/decline
-    if (exchange.owner.toString() !== req.user.id && status === "approved") {
-      return res
-        .status(403)
-        .json({ success: false, message: "Only owner can approve" });
+    const isOwner = exchange.owner.toString() === req.user.id;
+    const isBorrower = exchange.borrower.toString() === req.user.id;
+
+    console.log("Update exchange status:", {
+      exchangeId: exchange._id,
+      requestedStatus: status,
+      isOwner,
+      isBorrower,
+      userId: req.user.id,
+      ownerId: exchange.owner,
+      borrowerId: exchange.borrower
+    });
+
+    // === PERMISSION CHECKS ===
+    
+    if (status === "approved" && !isOwner) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Only the item owner can approve requests" 
+      });
     }
 
+    if (status === "canceled" && !isOwner && !isBorrower) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Not authorized to cancel this exchange" 
+      });
+    }
+
+    if (status === "active" && !isOwner) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Only owner can activate exchange" 
+      });
+    }
+
+    if (status === "completed" && !isOwner && !isBorrower) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Not authorized to complete this exchange" 
+      });
+    }
+
+    // === UPDATE STATUS ===
     exchange.status = status;
+    
     if (status === "approved") exchange.approvedAt = new Date();
     if (status === "active") exchange.activatedAt = new Date();
     if (status === "completed") exchange.completedAt = new Date();
@@ -94,26 +132,50 @@ exports.updateExchangeStatus = async (req, res) => {
 
     await exchange.save();
 
-    // Send notification to the other party
-    const recipient =
-      exchange.owner.toString() === req.user.id
-        ? exchange.borrower
-        : exchange.owner;
+    // === SEND NOTIFICATION ===
+    const recipientId = isOwner ? exchange.borrower : exchange.owner;
+    const resourceTitle = exchange.resource?.title || "item";
+    
+    let notificationTitle = "";
+    let notificationMessage = "";
+    
+    if (status === "approved") {
+      notificationTitle = "Request Approved";
+      notificationMessage = `${req.user.fullName} approved your request to borrow "${resourceTitle}"`;
+    } else if (status === "canceled") {
+      notificationTitle = "Request Declined";
+      notificationMessage = `${req.user.fullName} declined your request to borrow "${resourceTitle}"`;
+    } else {
+      notificationTitle = `Exchange ${status}`;
+      notificationMessage = `Your exchange has been ${status}`;
+    }
+
+    // ✅ FIXED: Use "request" type instead of "exchange"
     await Notification.create({
-      user: recipient,
-      type: "exchange",
-      title: `Exchange ${status}`,
-      message: `Your exchange request has been ${status}`,
+      user: recipientId,
+      type: "request",  // ← Changed from "exchange" to "request"
+      title: notificationTitle,
+      message: notificationMessage,
       data: { exchangeId: exchange._id, status },
       priority: "high",
     });
 
-    res.json({ success: true, exchange });
+    logger.info(`Exchange ${exchange._id} status updated to ${status} by ${req.user.id}`);
+
+    res.json({ 
+      success: true, 
+      exchange,
+      message: status === "approved" ? "Request approved successfully" : 
+               status === "canceled" ? "Request declined successfully" : 
+               "Exchange status updated"
+    });
+    
   } catch (error) {
     logger.error("Update exchange status error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to update exchange" });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || "Failed to update exchange" 
+    });
   }
 };
 
@@ -181,10 +243,10 @@ exports.returnExchange = async (req, res) => {
       $inc: { "stats.successfulExchanges": 1 },
     });
 
-    // Notify owner
+    // ✅ FIXED: Notify owner correctly
     await Notification.create({
-      user: exchange.owner,
-      type: "return",
+      user: exchange.owner,  // ← Use exchange.owner directly
+      type: "return",        // ← Use "return" type
       title: "Item Returned",
       message: `${req.user.fullName} has returned "${resource.title}"`,
       data: { exchangeId: exchange._id },

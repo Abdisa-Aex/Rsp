@@ -1,8 +1,9 @@
+
+
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-// import { useAuth } from "../../context/AuthContext";
 import { useAuth } from "context/AuthContext";
 import {
   Home,
@@ -13,9 +14,57 @@ import {
   User,
   Info,
   Crown,
-  Pepper as PepperIcon,
 } from "lucide-react";
 
+// const AdminLink = () => {
+  
+//   const pathname = usePathname();
+//   const { user, isAuthenticated } = useAuth();
+
+//   if (!isAuthenticated || user?.role !== "admin") return null;
+
+//   return (
+//     <Link
+//       href="/admin/dashboard"
+//       className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+//         pathname?.startsWith("/admin")
+//           ? "text-purple-600 dark:text-purple-400"
+//           : "text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+//       }`}
+//     >
+//       <span className="flex items-center gap-2">
+//         <Crown className="h-4 w-4" />
+//         Admin
+//       </span>
+//     </Link>
+//   );
+// };
+const AdminLink = () => {
+  const pathname = usePathname();
+  const { isAdmin, user } = useAuth(); // Use the isAdmin function from context
+
+  // Debug logging - remove after testing
+  console.log("AdminLink - isAdmin:", isAdmin());
+  console.log("AdminLink - user role:", user?.role);
+
+  if (!isAdmin()) return null; // Use the context's isAdmin function
+
+  return (
+    <Link
+      href="/admin/dashboard"
+      className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+        pathname?.startsWith("/admin")
+          ? "text-purple-600 dark:text-purple-400"
+          : "text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <Crown className="h-4 w-4" />
+        Admin
+      </span>
+    </Link>
+  );
+};
 const NavLinks = () => {
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
@@ -58,21 +107,7 @@ const NavLinks = () => {
         );
       })}
 
-      {isAuthenticated && user?.role === "admin" && (
-        <Link
-          href="/admin/dashboard"
-          className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-            pathname?.startsWith("/admin")
-              ? "text-purple-600 dark:text-purple-400"
-              : "text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-          }`}
-        >
-          <span className="flex items-center gap-2">
-            <Crown className="h-4 w-4" />
-            Admin
-          </span>
-        </Link>
-      )}
+      <AdminLink />
     </nav>
   );
 };

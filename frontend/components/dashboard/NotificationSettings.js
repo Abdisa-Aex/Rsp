@@ -12,13 +12,9 @@ import {
   Save,
   RefreshCw,
 } from "lucide-react";
-// import { useAuth } from "@/context/AuthContext";
 import { useAuth } from "context/AuthContext";
-
-// import pushService from "@/lib1/pushNotifications";
-import pushService from "../../lib/pushNotifications"
-// import { toast } from "react-hot-toast";
-import { ToastBar } from "react-hot-toast";
+import pushService from "@/lib/pushNotifications";
+import toast from "react-hot-toast";
 
 const NotificationSettings = () => {
   const { user, apiCall } = useAuth();
@@ -287,9 +283,9 @@ const NotificationSettings = () => {
               About Notifications
             </p>
             <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
-              You will also receive important notifications via email. Update your
-              email preferences in your profile settings. Push notifications
-              require browser permission and may vary by device.
+              You will also receive important notifications via email. Update
+              your email preferences in your profile settings. Push
+              notifications require browser permission and may vary by device.
             </p>
           </div>
         </div>

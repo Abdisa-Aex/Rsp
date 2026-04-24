@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -62,7 +60,7 @@ import Header from "components/layout/Header";
 import Footer from "components/layout/Footer";
 import AnnouncementBar from "components/layout/AnnouncementBar";
 import ProfileHeader from "components/profile/ProfileHeader";
-import ProfileStats from "components/profile/ProfileStats";
+
 import ItemsGrid from "components/profile/ItemsGrid";
 import ExchangesList from "components/profile/ExchangesList";
 import ReviewList from "components/profile/ReviewList";
@@ -74,7 +72,7 @@ import LogoutModal from "components/modals/LogoutModal";
 import ShareProfileModal from "components/modals/ShareProfileModal";
 import AddItemModal from "components/modals/AddItemModal";
 import DeleteAccountModal from "components/modals/DeleteAccountModal";
-import { useToast } from "hooks/useToast";
+
 import toast, { Toaster } from "react-hot-toast";
 
 // Helper function
@@ -147,7 +145,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-const [exchangeFilter, setExchangeFilter] = useState("all");
+  const [exchangeFilter, setExchangeFilter] = useState("all");
   // Search and filter states for items
   const [searchQuery, setSearchQuery] = useState("");
   const [itemsFilter, setItemsFilter] = useState("all");
@@ -305,38 +303,50 @@ const [exchangeFilter, setExchangeFilter] = useState("all");
       setLoading(false);
     }
   };
-const handleApprove = async (exchange) => {
-  try {
-    const response = await apiCall(`/exchanges/${exchange.id}/status`, {
-      method: "PUT",
-      body: JSON.stringify({ status: "approved" }),
-    });
-    if (response.success) {
-      toast.success("Exchange approved");
-      loadProfileData();
+  const handleApprove = async (exchange) => {
+    const exchangeId = exchange?.id || exchange?._id;
+    if (!exchangeId) {
+      toast.error("Cannot approve: Missing exchange ID");
+      return;
     }
-  } catch (error) {
-    toast.error("Failed to approve");
-  }
-};
 
-const handleDecline = async (exchange) => {
-  try {
-    const response = await apiCall(`/exchanges/${exchange.id}/status`, {
-      method: "PUT",
-      body: JSON.stringify({ status: "canceled" }),
-    });
-    if (response.success) {
-      toast.success("Exchange declined");
-      loadProfileData();
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (response.success) {
+        toast.success("Exchange approved");
+        loadProfileData();
+      }
+    } catch (error) {
+      toast.error("Failed to approve");
     }
-  } catch (error) {
-    toast.error("Failed to decline");
-  }
-};
-  // Handle avatar upload
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files[0];
+  };
+
+  const handleDecline = async (exchange) => {
+    const exchangeId = exchange?.id || exchange?._id;
+    if (!exchangeId) {
+      toast.error("Cannot decline: Missing exchange ID");
+      return;
+    }
+
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "canceled" }),
+      });
+      if (response.success) {
+        toast.success("Exchange declined");
+        loadProfileData();
+      }
+    } catch (error) {
+      toast.error("Failed to decline");
+    }
+  };
+  const handleAvatarUpload = async (file) => {
+    console.log("1. File received:", file?.name);
+
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
@@ -354,19 +364,50 @@ const handleDecline = async (exchange) => {
     formData.append("avatar", file);
 
     try {
-      const response = await apiCall("/upload/avatar", {
+      // Get token from localStorage
+      const token = localStorage.getItem("token");
+      console.log("2. Token exists:", !!token);
+
+      // Upload to Cloudinary via your backend
+      const uploadRes = await fetch("http://localhost:5000/api/upload/avatar", {
         method: "POST",
+        headers: {
+          "x-auth-token": token,
+        },
         body: formData,
-        headers: {},
       });
 
-      if (response.success) {
-        setProfile({ ...profile, avatar: response.url });
+      const uploadData = await uploadRes.json();
+      console.log("3. Upload response:", uploadData);
+
+      if (!uploadData.success) {
+        toast.error(uploadData.message || "Upload failed");
+        return;
+      }
+
+      // Update user profile with new avatar URL
+      const updateRes = await fetch("http://localhost:5000/api/users/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-auth-token": token,
+        },
+        body: JSON.stringify({ avatar: uploadData.url }),
+      });
+
+      const updateData = await updateRes.json();
+      console.log("4. Update response:", updateData);
+
+      if (updateData.success) {
+        setProfile(updateData.user);
         toast.success("Avatar updated successfully");
+        loadProfileData(); // Refresh all data
+      } else {
+        toast.error("Failed to save avatar to profile");
       }
     } catch (error) {
-      console.error("Avatar upload error:", error);
-      toast.error("Failed to upload avatar");
+      console.error("Upload error:", error);
+      toast.error(error.message);
     } finally {
       setUploadingAvatar(false);
     }
@@ -452,11 +493,16 @@ const handleDecline = async (exchange) => {
     }
   };
 
-  // Handle remove from wishlist
   const handleRemoveFromWishlist = async (item) => {
+    const itemId = item?.id || item?._id;
+    if (!itemId) {
+      toast.error("Cannot remove: Missing item ID");
+      return;
+    }
+
     try {
-      await apiCall(`/wishlist/${item.id}`, { method: "DELETE" });
-      setWishlist(wishlist.filter((i) => i.id !== item.id));
+      await apiCall(`/wishlist/${itemId}`, { method: "DELETE" });
+      setWishlist(wishlist.filter((i) => (i.id || i._id) !== itemId));
       toast.success("Removed from wishlist");
     } catch (error) {
       console.error("Remove from wishlist error:", error);
@@ -466,17 +512,41 @@ const handleDecline = async (exchange) => {
 
   // Handle move to request
   const handleMoveToRequest = (item) => {
-    router.push(`/resources/${item.id}?request=true`);
+    const itemId = item?.id || item?._id;
+    if (!itemId) {
+      toast.error("Cannot request: Missing item ID");
+      return;
+    }
+    router.push(`/resources/${itemId}?request=true`);
   };
 
-  // Handle return item
+  // Handle return item - FIXED version
   const handleReturn = (exchange) => {
-    router.push(`/return/${exchange.id}`);
+    // Get ID from either 'id' or '_id' field
+    const exchangeId = exchange?.id || exchange?._id;
+
+    console.log("=== handleReturn ===");
+    console.log("Full exchange object:", exchange);
+    console.log("Exchange ID:", exchangeId);
+
+    if (!exchangeId) {
+      console.error("No exchange ID found!");
+      toast.error("Cannot return: Missing exchange ID");
+      return;
+    }
+
+    router.push(`/return/${exchangeId}`);
   };
 
-  // Handle rate exchange
+  // Handle rate exchange - FIXED version
   const handleRate = (exchange) => {
-    router.push(`/rate/${exchange.id}`);
+    const exchangeId = exchange?.id || exchange?._id;
+    if (!exchangeId) {
+      console.error("No exchange ID found for rating!");
+      toast.error("Cannot rate: Missing exchange ID");
+      return;
+    }
+    router.push(`/rate/${exchangeId}`);
   };
 
   // Handle notification actions
@@ -719,6 +789,44 @@ const handleDecline = async (exchange) => {
             onUpdate={handleProfileUpdate}
             onLogout={() => setShowLogoutModal(true)}
             onDelete={() => setShowDeleteModal(true)}
+            // Add missing props:
+            notifications={profile?.notificationPreferences || {}}
+            setNotifications={() => {}} // You'll need to implement
+            handleNotificationToggle={(key) => {
+              // Call API to update preferences
+              apiCall("/users/me", {
+                method: "PUT",
+                body: JSON.stringify({
+                  notificationPreferences: {
+                    ...profile?.notificationPreferences,
+                    [key]: !profile?.notificationPreferences?.[key],
+                  },
+                }),
+              });
+            }}
+            privacy={
+              profile?.preferences?.privacy?.profileVisibility || "public"
+            }
+            setPrivacy={(value) => {
+              apiCall("/users/me", {
+                method: "PUT",
+                body: JSON.stringify({
+                  preferences: {
+                    ...profile?.preferences,
+                    privacy: {
+                      ...profile?.preferences?.privacy,
+                      profileVisibility: value,
+                    },
+                  },
+                }),
+              });
+            }}
+            showPassword={false} // Local UI state
+            setShowPassword={() => {}} // Local UI state
+            handleQuickAction={(action) => {
+              if (action === "backup") handleExportData();
+              else if (action === "help") router.push("/help");
+            }}
           />
         );
 

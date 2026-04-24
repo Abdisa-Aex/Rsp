@@ -1,43 +1,4 @@
-// const mongoose = require("mongoose");
-// require("dotenv").config();
 
-// const createIndexes = async () => {
-//   try {
-//     await mongoose.connect(process.env.MONGO_URI);
-//     console.log("Connected to MongoDB");
-
-//     const User = require("../models/User");
-//     const Resource = require("../models/Resource");
-//     const Exchange = require("../models/Exchange");
-
-//     // User indexes
-//     await User.collection.createIndex({ email: 1 });
-//     await User.collection.createIndex({ username: 1 });
-//     await User.collection.createIndex({ trustScore: -1 });
-
-//     // Resource indexes
-//     await Resource.collection.createIndex({ category: 1, status: 1 });
-//     await Resource.collection.createIndex({
-//       location: "text",
-//       title: "text",
-//       description: "text",
-//     });
-//     await Resource.collection.createIndex({ coordinates: "2dsphere" });
-
-//     // Exchange indexes
-//     await Exchange.collection.createIndex({ owner: 1, status: 1 });
-//     await Exchange.collection.createIndex({ borrower: 1, status: 1 });
-//     await Exchange.collection.createIndex({ startDate: 1, endDate: 1 });
-
-//     console.log("✅ All indexes created successfully");
-//     process.exit(0);
-//   } catch (error) {
-//     console.error("Error creating indexes:", error);
-//     process.exit(1);
-//   }
-// };
-
-// createIndexes();
 
 const mongoose = require("mongoose");
 require("dotenv").config();

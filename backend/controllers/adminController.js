@@ -183,33 +183,234 @@ exports.deleteBadge = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to delete badge" });
   }
 };
-// @desc    Export all data
-// @route   GET /api/admin/export/all
-// @access  Private/Admin
+
+// @desc    Export all user data
+// @route   GET /api/users/me/export-all
+// @access  Private
 exports.exportAllData = async (req, res) => {
   try {
-    const users = await User.find().select("-password -refreshTokens");
-    const resources = await Resource.find();
-    const exchanges = await Exchange.find();
-    const reports = await Report.find();
-
+    const userId = req.user.id;
+    
+    // Fetch all user data
+    const user = await User.findById(userId).select("-password -refreshTokens -verificationCode -twoFactorSecret -magicToken");
+    const resources = await Resource.find({ owner: userId });
+    const exchanges = await Exchange.find({
+      $or: [{ owner: userId }, { borrower: userId }]
+    });
+    const reviews = await Review.find({ reviewer: userId });
+    const notifications = await Notification.find({ user: userId });
+    
+    // Get wishlist items
+    const wishlistItems = await Resource.find({ _id: { $in: user.wishlist || [] } });
+    
     const exportData = {
+      version: "2.0.0",
       exportedAt: new Date().toISOString(),
-      stats: {
-        totalUsers: users.length,
-        totalResources: resources.length,
-        totalExchanges: exchanges.length,
-        totalReports: reports.length,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        username: user.username,
+        userType: user.userType,
+        phone: user.phone,
+        location: user.location,
+        bio: user.bio,
+        points: user.points,
+        trustScore: user.trustScore,
+        rating: user.rating,
+        preferences: user.preferences,
+        notificationPreferences: user.notificationPreferences,
+        stats: user.stats,
+        createdAt: user.createdAt,
       },
-      data: { users, resources, exchanges, reports },
+      resources: resources.map(r => ({
+        _id: r._id,
+        title: r.title,
+        description: r.description,
+        category: r.category,
+        location: r.location,
+        price: r.price,
+        priceType: r.priceType,
+        status: r.status,
+        images: r.images,
+        createdAt: r.createdAt,
+      })),
+      exchanges: exchanges.map(e => ({
+        _id: e._id,
+        resource: e.resource,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        status: e.status,
+        totalAmount: e.totalAmount,
+        createdAt: e.createdAt,
+      })),
+      reviews: reviews.map(r => ({
+        _id: r._id,
+        rating: r.rating,
+        review: r.review,
+        createdAt: r.createdAt,
+      })),
+      notifications: notifications.map(n => ({
+        _id: n._id,
+        title: n.title,
+        message: n.message,
+        read: n.read,
+        createdAt: n.createdAt,
+      })),
+      wishlist: wishlistItems.map(w => ({
+        _id: w._id,
+        title: w.title,
+        category: w.category,
+        price: w.price,
+      })),
     };
-
-    res.json({ success: true, data: exportData });
+    
+    res.json({
+      success: true,
+      data: exportData,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Export all data error:", error);
+    logger.error(`Export all data error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
+// @desc    Import user data (restore from backup)
+// @route   POST /api/users/me/import
+// @access  Private
+exports.importData = async (req, res) => {
+  try {
+    const { data } = req.body;
+    const userId = req.user.id;
+    
+    if (!data || !data.version) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid backup data",
+      });
+    }
+    
+    let importedCount = 0;
+    
+    // Import resources
+    if (data.resources && data.resources.length > 0) {
+      for (const resource of data.resources) {
+        // Check if resource already exists
+        const existingResource = await Resource.findOne({
+          title: resource.title,
+          owner: userId
+        });
+        
+        if (!existingResource) {
+          const newResource = new Resource({
+            ...resource,
+            owner: userId,
+            _id: undefined, // Let MongoDB generate new ID
+            images: resource.images || [],
+          });
+          await newResource.save();
+          importedCount++;
+        }
+      }
+    }
+    
+    // Import preferences
+    if (data.user && data.user.preferences) {
+      await User.findByIdAndUpdate(userId, {
+        $set: {
+          preferences: data.user.preferences,
+          notificationPreferences: data.user.notificationPreferences || {
+            messages: true,
+            requests: true,
+            returns: true,
+            reviews: true,
+            promotions: false,
+            system: true,
+          },
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: `Data imported successfully. Imported ${importedCount} items.`,
+      imported: {
+        resources: importedCount,
+      }
+    });
+  } catch (error) {
+    console.error("Import data error:", error);
+    logger.error(`Import data error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Reset all user data
+// @route   DELETE /api/users/me/reset
+// @access  Private
+exports.resetUserData = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Delete all user resources
+    await Resource.deleteMany({ owner: userId });
+    
+    // Delete all exchanges involving user
+    await Exchange.deleteMany({
+      $or: [{ owner: userId }, { borrower: userId }]
+    });
+    
+    // Delete all reviews by user
+    await Review.deleteMany({ reviewer: userId });
+    
+    // Delete all notifications for user
+    await Notification.deleteMany({ user: userId });
+    
+    // Reset user stats and wishlist
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        wishlist: [],
+        points: 0,
+        trustScore: 0,
+        rating: 0,
+        totalRatings: 0,
+        stats: {
+          itemsShared: 0,
+          itemsBorrowed: 0,
+          successfulExchanges: 0,
+          canceledExchanges: 0,
+          responseRate: 0,
+          avgResponseTime: 0,
+          totalSavings: 0,
+          carbonSaved: 0,
+          totalViews: 0,
+          profileViews: 0,
+        },
+      }
+    });
+    
+    logger.info(`User ${userId} reset all data`);
+    
+    res.json({
+      success: true,
+      message: "All data has been reset successfully",
+    });
+  } catch (error) {
+    console.error("Reset data error:", error);
+    logger.error(`Reset data error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 // @desc    Clear all notifications
 // @route   DELETE /api/admin/notifications/clear
 // @access  Private/Admin

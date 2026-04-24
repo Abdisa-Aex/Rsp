@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 const path = require("path");
 const morgan = require("morgan");
 const exchangeRoutes = require("./routes/exchanges");
+const activityRoutes = require("./routes/activities");
 
 // ============ SENTRY INITIALIZATION (OPTIONAL) ============
 let Sentry;
@@ -127,7 +128,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/exchanges", exchangeRoutes);
-
+app.use("/api/activities", activityRoutes);
 // ============ HEALTH CHECK ============
 app.get("/api/health", async (req, res) => {
   const dbStatus =

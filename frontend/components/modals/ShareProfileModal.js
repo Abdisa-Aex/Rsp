@@ -5,12 +5,13 @@ import {
   Share2,
   Copy,
   Check,
-  Facebook,
+ 
   X,
   Link as LinkIcon,
   Users,
-  Mail,
+  
 } from "lucide-react";
+import { Facebook, Mail } from "react-feather";
 import Modal from "components/ui/Modal";
 import Button from "components/ui/Button";
 

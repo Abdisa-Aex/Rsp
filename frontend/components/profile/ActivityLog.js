@@ -20,10 +20,9 @@ const ActivityLog = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch activities on component mount and when filter changes
   useEffect(() => {
     fetchActivities();
-    fetchSavedSearches();
+    // fetchSavedSearches(); // Commented out - endpoint not implemented
   }, [filter]);
 
   const fetchActivities = async () => {
@@ -31,30 +30,44 @@ const ActivityLog = () => {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("token") || localStorage.getItem("authToken");
       if (!token) {
         console.warn("No auth token found");
         setActivities([]);
         return;
       }
 
-      const url =
-        filter === "all"
-          ? "http://localhost:5000/api/users/me/activities"
-          : `http://localhost:5000/api/users/me/activities?action=${filter}`;
+      // Build URL with filter
+      let url = "http://localhost:5000/api/users/me/activities";
+      if (filter !== "all") {
+        url += `?action=${filter}`;
+      }
 
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${token}`,
-          "x-auth-token": token,
+          "x-auth-token": token, // ← Use only this header
           "Content-Type": "application/json",
         },
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        setActivities(data.activities || []);
+      if (data.success && data.activities) {
+        // Transform backend data to match component expectations
+        const transformedActivities = data.activities.map((activity) => ({
+          id: activity.id || activity._id,
+          action: activity.type, // ← Map 'type' to 'action'
+          item: activity.title, // ← Map 'title' to 'item'
+          user: activity.user,
+          userId: activity.userId,
+          time: activity.timeAgo || getTimeAgo(activity.createdAt),
+          timestamp: activity.createdAt,
+          status: activity.status,
+          startDate: activity.startDate,
+          endDate: activity.endDate,
+        }));
+        setActivities(transformedActivities);
       } else {
         setError(data.message || "Failed to fetch activities");
       }
@@ -66,26 +79,22 @@ const ActivityLog = () => {
     }
   };
 
-  const fetchSavedSearches = async () => {
-    try {
-      const token = localStorage.getItem("authToken");
-      if (!token) return;
-
-      const response = await fetch("http://localhost:5000/api/saved-searches", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "x-auth-token": token,
-        },
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSavedSearches(data.savedSearches || []);
-      }
-    } catch (err) {
-      console.error("Error fetching saved searches:", err);
-    }
+  // Helper to format time
+  const getTimeAgo = (date) => {
+    if (!date) return "recently";
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
+    return new Date(date).toLocaleDateString();
   };
+
+  // fetchSavedSearches temporarily disabled
+  // const fetchSavedSearches = async () => { ... };
 
   const getActivityIcon = (action) => {
     switch (action) {
@@ -251,6 +260,14 @@ const ActivityLog = () => {
                       </p>
                     </div>
                   )}
+                  {activity.status && (
+                    <div>
+                      <p className="text-gray-500 dark:text-gray-400">Status</p>
+                      <p className="text-gray-900 dark:text-white capitalize">
+                        {activity.status}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -258,7 +275,7 @@ const ActivityLog = () => {
         ))}
       </div>
 
-      {/* Saved Searches */}
+      {/* Saved Searches - Temporarily disabled */}
       {savedSearches.length > 0 && (
         <div className="mt-8">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-4">

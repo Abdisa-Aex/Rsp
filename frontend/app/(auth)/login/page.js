@@ -34,8 +34,6 @@ import {
   ShieldCheck,
   Laptop,
   Tablet,
- 
-  
   X,
   Check,
   ExternalLink,
@@ -460,8 +458,8 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
   // const redirectTo = searchParams.get("redirect") || "/profile";
-const { login, getSessions, revokeSession, revokeAllSessions, verify2FA } =
-  useAuth();
+  const { login, getSessions, revokeSession, revokeAllSessions, verify2FA } =
+    useAuth();
 
   // Form state
   const [email, setEmail] = useState("");

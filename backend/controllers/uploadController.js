@@ -152,6 +152,12 @@ exports.uploadAvatar = async (req, res) => {
       ],
     });
 
+    // ✅ ADD THIS - Save to database
+    const User = require('../models/User');
+    await User.findByIdAndUpdate(req.user.id, { 
+      avatar: result.secure_url 
+    });
+
     res.json({
       success: true,
       url: result.secure_url,

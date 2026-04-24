@@ -2,10 +2,15 @@
 
 import ItemsGrid from "./ItemsGrid";
 
-const ItemsTab = ({ items, onEdit, onDelete, onView }) => {
+const ItemsTab = ({
+  items, // ← Will receive 'items' prop
+  onEdit,
+  onDelete,
+  onView,
+}) => {
   return (
     <ItemsGrid
-      items={items}
+      filteredItems={items} // ← Map 'items' to 'filteredItems' for ItemsGrid
       onEdit={onEdit}
       onDelete={onDelete}
       onView={onView}

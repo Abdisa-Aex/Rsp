@@ -8,7 +8,7 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
-  timeout: 120000, // Increase timeout to 120 seconds
+  // timeout: 120000, // 120 seconds timeout
 });
 
 // Upload file to Cloudinary with retry logic
@@ -57,7 +57,7 @@ exports.deleteFromCloudinary = async (publicId) => {
     console.log("No publicId provided, skipping deletion");
     return { result: "skipped" };
   }
-  
+
   try {
     const result = await cloudinary.uploader.destroy(publicId);
     logger.info(`Deleted from Cloudinary: ${publicId}`);
