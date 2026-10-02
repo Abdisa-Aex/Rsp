@@ -2,78 +2,35 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
 import Link from "next/link";
 import { useAuth } from "context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
   Star,
-  Edit,
-  Shield,
-  Award,
-  Zap,
-  Users,
-  Camera,
-  X,
-  Check,
-  Share2,
-  MoreVertical,
-  BarChart3,
   Package,
-  Heart,
-  Clock,
   TrendingUp,
-  Target,
-  Leaf,
-  DollarSign,
-  MessageCircle,
-  Bookmark,
   Settings,
-  LogOut,
-  Trash2,
-  Download,
-  Upload,
-  RefreshCw,
-  Globe,
   Lock,
-  Unlock,
   Eye,
-  EyeOff,
   Bell,
-  Sun,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Plus,
-  Search,
   Handshake,
-  RotateCcw,
-  Activity,
-  ThumbsUp,
 } from "lucide-react";
 import Header from "components/layout/Header";
 import Footer from "components/layout/Footer";
 import AnnouncementBar from "components/layout/AnnouncementBar";
 import ProfileHeader from "components/profile/ProfileHeader";
 
-import ItemsGrid from "components/profile/ItemsGrid";
-import ExchangesList from "components/profile/ExchangesList";
-import ReviewList from "components/profile/ReviewList";
 import SettingsPanel from "components/profile/SettingsPanel";
-import WishlistGrid from "components/profile/WishlistGrid";
-import NotificationsList from "components/profile/NotificationsList";
-import AnalyticsOverview from "components/profile/AnalyticsOverview";
+
 import LogoutModal from "components/modals/LogoutModal";
 import ShareProfileModal from "components/modals/ShareProfileModal";
-import AddItemModal from "components/modals/AddItemModal";
+
 import DeleteAccountModal from "components/modals/DeleteAccountModal";
 
 import toast, { Toaster } from "react-hot-toast";
+import { Loader2 } from "lucide-react";
 
 // Helper function
 const getInitials = (name) => {
@@ -145,14 +102,10 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [exchangeFilter, setExchangeFilter] = useState("all");
-  // Search and filter states for items
-  const [searchQuery, setSearchQuery] = useState("");
-  const [itemsFilter, setItemsFilter] = useState("all");
 
   // Modal states
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -165,18 +118,10 @@ export default function ProfilePage() {
     itemsBorrowed: 0,
     successfulExchanges: 0,
     responseRate: 0,
-    trustScore: 0,
-    points: 0,
-    totalSavings: 0,
-    carbonSaved: 0,
   });
   const [badges, setBadges] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [myItems, setMyItems] = useState([]);
-  const [exchanges, setExchanges] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [wishlist, setWishlist] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+
   const [analytics, setAnalytics] = useState({
     profileViews: 0,
     resourceViews: 0,
@@ -214,20 +159,7 @@ export default function ProfilePage() {
           success: false,
           activities: [],
         })),
-        apiCall("/users/me/items").catch(() => ({ success: false, items: [] })),
-        apiCall("/users/me/exchanges").catch(() => ({
-          success: false,
-          exchanges: [],
-        })),
-        apiCall("/users/me/reviews").catch(() => ({
-          success: false,
-          reviews: [],
-        })),
-        apiCall("/wishlist").catch(() => ({ success: false, wishlist: [] })),
-        apiCall("/notifications?limit=20").catch(() => ({
-          success: false,
-          notifications: [],
-        })),
+
         apiCall("/users/me/analytics").catch(() => ({
           success: false,
           analytics: {},
@@ -243,7 +175,7 @@ export default function ProfilePage() {
         itemsRes,
         exchangesRes,
         reviewsRes,
-        wishlistRes,
+
         notificationsRes,
         analyticsRes,
       ] = results;
@@ -270,80 +202,17 @@ export default function ProfilePage() {
         setActivities(activitiesRes.value.activities);
       }
 
-      if (itemsRes.status === "fulfilled" && itemsRes.value?.success) {
-        setMyItems(itemsRes.value.items);
-      }
-
-      if (exchangesRes.status === "fulfilled" && exchangesRes.value?.success) {
-        setExchanges(exchangesRes.value.exchanges);
-      }
-
-      if (reviewsRes.status === "fulfilled" && reviewsRes.value?.success) {
-        setReviews(reviewsRes.value.reviews);
-      }
-
-      if (wishlistRes.status === "fulfilled" && wishlistRes.value?.success) {
-        setWishlist(wishlistRes.value.wishlist || []);
-      }
-
-      if (
-        notificationsRes.status === "fulfilled" &&
-        notificationsRes.value?.success
-      ) {
-        setNotifications(notificationsRes.value.notifications || []);
-      }
-
       if (analyticsRes.status === "fulfilled" && analyticsRes.value?.success) {
         setAnalytics(analyticsRes.value.analytics);
       }
     } catch (error) {
       console.error("Load profile error:", error);
-      toast.error("Failed to load some profile data");
+
     } finally {
       setLoading(false);
     }
   };
-  const handleApprove = async (exchange) => {
-    const exchangeId = exchange?.id || exchange?._id;
-    if (!exchangeId) {
-      toast.error("Cannot approve: Missing exchange ID");
-      return;
-    }
 
-    try {
-      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status: "approved" }),
-      });
-      if (response.success) {
-        toast.success("Exchange approved");
-        loadProfileData();
-      }
-    } catch (error) {
-      toast.error("Failed to approve");
-    }
-  };
-
-  const handleDecline = async (exchange) => {
-    const exchangeId = exchange?.id || exchange?._id;
-    if (!exchangeId) {
-      toast.error("Cannot decline: Missing exchange ID");
-      return;
-    }
-
-    try {
-      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status: "canceled" }),
-      });
-      if (response.success) {
-        toast.success("Exchange declined");
-        loadProfileData();
-      }
-    } catch (error) {
-      toast.error("Failed to decline");
-    }
-  };
   const handleAvatarUpload = async (file) => {
     console.log("1. File received:", file?.name);
 
@@ -424,29 +293,6 @@ export default function ProfilePage() {
     return result;
   };
 
-  // ============ ADD MISSING handleAddItem FUNCTION ============
-  const handleAddItem = async (itemData) => {
-    setIsSubmitting(true);
-    try {
-      const response = await apiCall("/resources", {
-        method: "POST",
-        body: itemData,
-        headers: {},
-      });
-      if (response.success) {
-        toast.success("Item added successfully!");
-        loadProfileData();
-        setShowAddItemModal(false);
-      } else {
-        toast.error(response.message || "Failed to add item");
-      }
-    } catch (error) {
-      console.error("Add item error:", error);
-      toast.error(error.message || "Failed to add item");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
   // ============================================================
 
   // Handle logout
@@ -493,131 +339,10 @@ export default function ProfilePage() {
     }
   };
 
-  const handleRemoveFromWishlist = async (item) => {
-    const itemId = item?.id || item?._id;
-    if (!itemId) {
-      toast.error("Cannot remove: Missing item ID");
-      return;
-    }
-
-    try {
-      await apiCall(`/wishlist/${itemId}`, { method: "DELETE" });
-      setWishlist(wishlist.filter((i) => (i.id || i._id) !== itemId));
-      toast.success("Removed from wishlist");
-    } catch (error) {
-      console.error("Remove from wishlist error:", error);
-      toast.error("Failed to remove from wishlist");
-    }
-  };
-
-  // Handle move to request
-  const handleMoveToRequest = (item) => {
-    const itemId = item?.id || item?._id;
-    if (!itemId) {
-      toast.error("Cannot request: Missing item ID");
-      return;
-    }
-    router.push(`/resources/${itemId}?request=true`);
-  };
-
-  // Handle return item - FIXED version
-  const handleReturn = (exchange) => {
-    // Get ID from either 'id' or '_id' field
-    const exchangeId = exchange?.id || exchange?._id;
-
-    console.log("=== handleReturn ===");
-    console.log("Full exchange object:", exchange);
-    console.log("Exchange ID:", exchangeId);
-
-    if (!exchangeId) {
-      console.error("No exchange ID found!");
-      toast.error("Cannot return: Missing exchange ID");
-      return;
-    }
-
-    router.push(`/return/${exchangeId}`);
-  };
-
-  // Handle rate exchange - FIXED version
-  const handleRate = (exchange) => {
-    const exchangeId = exchange?.id || exchange?._id;
-    if (!exchangeId) {
-      console.error("No exchange ID found for rating!");
-      toast.error("Cannot rate: Missing exchange ID");
-      return;
-    }
-    router.push(`/rate/${exchangeId}`);
-  };
-
-  // Handle notification actions
-  const handleMarkAsRead = async (id) => {
-    try {
-      await apiCall(`/notifications/${id}/read`, { method: "PUT" });
-      setNotifications(
-        notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      );
-    } catch (error) {
-      console.error("Mark as read error:", error);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    try {
-      await apiCall("/notifications/read-all", { method: "PUT" });
-      setNotifications(notifications.map((n) => ({ ...n, read: true })));
-      toast.success("All notifications marked as read");
-    } catch (error) {
-      console.error("Mark all read error:", error);
-    }
-  };
-
-  const handleDeleteNotification = async (id) => {
-    try {
-      await apiCall(`/notifications/${id}`, { method: "DELETE" });
-      setNotifications(notifications.filter((n) => n.id !== id));
-    } catch (error) {
-      console.error("Delete notification error:", error);
-    }
-  };
-
-  const handleClearAllNotifications = async () => {
-    try {
-      await apiCall("/notifications", { method: "DELETE" });
-      setNotifications([]);
-      toast.success("All notifications cleared");
-    } catch (error) {
-      console.error("Clear notifications error:", error);
-    }
-  };
-
-  // Handle quick action from settings
-  const handleQuickAction = (action) => {
-    if (action === "backup") {
-      handleExportData();
-    } else if (action === "help") {
-      router.push("/help");
-    }
-  };
-
   // Tabs configuration
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
-    { id: "items", label: "My Items", icon: Package, count: myItems.length },
-    {
-      id: "exchanges",
-      label: "Exchanges",
-      icon: Handshake,
-      count: exchanges.length,
-    },
-    { id: "reviews", label: "Reviews", icon: Star, count: reviews.length },
-    { id: "wishlist", label: "Wishlist", icon: Heart, count: wishlist.length },
-    {
-      id: "notifications",
-      label: "Notifications",
-      icon: Bell,
-      count: notifications.filter((n) => !n.read).length,
-    },
-    { id: "analytics", label: "Analytics", icon: BarChart3 },
+
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -666,7 +391,7 @@ export default function ProfilePage() {
               </div>
             )}
             <div className="flex items-center justify-between py-3 border-b">
-              <span className="text-gray-600">Trust Score</span>
+              <span className="text-gray-600">Trust Score </span>
               <div className="flex items-center gap-2">
                 <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
@@ -694,93 +419,6 @@ export default function ProfilePage() {
             </div>
           </div>
         );
-
-      case "items":
-        return (
-          <ItemsGrid
-            filteredItems={myItems} // ← Correct prop name
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            itemsFilter={itemsFilter}
-            setItemsFilter={setItemsFilter}
-            setShowAddItemModal={setShowAddItemModal}
-            onEdit={(item) => router.push(`/resources/${item._id}/edit`)}
-            onDelete={async (item) => {
-              if (confirm(`Delete "${item.title}"?`)) {
-                try {
-                  const response = await apiCall(`/resources/${item._id}`, {
-                    method: "DELETE",
-                  });
-
-                  if (response && response.success === true) {
-                    toast.success("Item deleted successfully");
-                    // ONLY update local state - NO loadProfileData()
-                    setMyItems((prevItems) =>
-                      prevItems.filter((i) => i._id !== item._id),
-                    );
-                    // Also update stats
-                    setStats((prev) => ({
-                      ...prev,
-                      itemsShared: Math.max(0, (prev.itemsShared || 0) - 1),
-                    }));
-                  } else {
-                    toast.error(response?.message || "Failed to delete item");
-                  }
-                } catch (error) {
-                  toast.error(error.message || "Failed to delete item");
-                }
-              }
-            }}
-            onView={(item) => router.push(`/resources/${item._id}`)}
-          />
-        );
-
-      case "exchanges":
-        return (
-          <ExchangesList
-            exchanges={exchanges}
-            filter={exchangeFilter}
-            onFilterChange={setExchangeFilter}
-            onApprove={handleApprove}
-            onDecline={handleDecline}
-            onReturn={handleReturn}
-            onRate={handleRate}
-          />
-        );
-
-      case "reviews":
-        return (
-          <ReviewList
-            reviews={reviews}
-            onHelpful={async (reviewId) => {
-              await apiCall(`/reviews/${reviewId}/helpful`, { method: "POST" });
-              loadProfileData();
-            }}
-          />
-        );
-
-      case "wishlist":
-        return (
-          <WishlistGrid
-            wishlist={wishlist}
-            onRemove={handleRemoveFromWishlist}
-            onMoveToRequest={handleMoveToRequest}
-          />
-        );
-
-      case "notifications":
-        return (
-          <NotificationsList
-            notifications={notifications}
-            onMarkAsRead={handleMarkAsRead}
-            onMarkAllRead={handleMarkAllRead}
-            onDelete={handleDeleteNotification}
-            onClearAll={handleClearAllNotifications}
-          />
-        );
-
-      case "analytics":
-        return <AnalyticsOverview analytics={analytics} />;
 
       case "settings":
         return (
@@ -869,34 +507,7 @@ export default function ProfilePage() {
               trend={8}
               color="blue"
             />
-            <StatCard
-              icon={Star}
-              label="Trust Score"
-              value={`${stats.trustScore}%`}
-              trend={5}
-              color="amber"
-            />
-            <StatCard
-              icon={Award}
-              label="Points"
-              value={stats.points}
-              trend={15}
-              color="purple"
-            />
-            <StatCard
-              icon={DollarSign}
-              label="Money Saved"
-              value={`$${stats.totalSavings}`}
-              trend={20}
-              color="emerald"
-            />
-            <StatCard
-              icon={Leaf}
-              label="CO₂ Saved"
-              value={`${stats.carbonSaved}kg`}
-              trend={10}
-              color="green"
-            />
+
             <StatCard
               icon={Eye}
               label="Profile Views"
@@ -961,47 +572,6 @@ export default function ProfilePage() {
 
             <div className="p-6">{renderTabContent()}</div>
           </div>
-
-          {/* Activity Feed */}
-          {activities.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 mt-8">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Recent Activity
-              </h3>
-              <div className="space-y-2">
-                {activities.map((activity) => (
-                  <div
-                    key={activity._id}
-                    className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 flex items-center justify-center text-white">
-                      {activity.type === "share" ? (
-                        <Package className="h-4 w-4" />
-                      ) : (
-                        <Handshake className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{activity.user}</span>
-                        <span className="text-gray-600">
-                          {" "}
-                          {activity.action}{" "}
-                        </span>
-                        <span className="font-medium">{activity.item}</span>
-                      </p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {activity.timeAgo}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1025,13 +595,6 @@ export default function ProfilePage() {
         onClose={() => setShowShareModal(false)}
         profileUrl={`${window.location.origin}/profile/${user?.id}`}
         userName={user?.fullName}
-      />
-
-      <AddItemModal
-        isOpen={showAddItemModal}
-        onClose={() => setShowAddItemModal(false)}
-        onAdd={handleAddItem}
-        isSubmitting={isSubmitting}
       />
 
       <Footer />

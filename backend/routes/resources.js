@@ -97,7 +97,9 @@ router.get("/stats", resourceController.getStats);
 router.get("/analytics", auth, resourceController.getResourceAnalytics);
 router.get("/recommended", auth, resourceController.getRecommendedResources);
 router.get("/user/:userId", resourceController.getUserResources);
-router.get("/slug/:slug", resourceController.getResourceBySlug);
+router.get("/slug/:slug", resourceController.getResourceBySlug);// Add this route (admin only recommended)
+// router.post("/cleanup", auth, admin, resourceController.cleanupOrphanedExchanges);
+
 // router.delete("/bulk", auth, admin, resourceController.bulkDeleteResources);
 router.post(
   "/",

@@ -6,10 +6,12 @@ const exchangeController = require("../controllers/exchangeController");
 // Routes
 router.get("/", auth, exchangeController.getMyExchanges);
 router.get("/:id", auth, exchangeController.getExchangeById);
+router.get("/me/exchanges", auth, exchangeController.getMyExchanges);
 router.put("/:id/status", auth, exchangeController.updateExchangeStatus);
 router.post("/:id/return", auth, exchangeController.returnExchange); // ← ADD THIS (for return)
 router.post("/:id/rate", auth, exchangeController.rateExchange); // ← ADD THIS (for rating)
-
+router.delete("/:id", auth, exchangeController.deleteExchange);
+router.post("/:id/messages", auth, exchangeController.sendExchangeMessage);
 // Remove or keep for backward compatibility
 router.post("/:id/complete", auth, exchangeController.completeExchange); // ← Optional, for old code
 

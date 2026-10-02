@@ -425,6 +425,10 @@ ExchangeSchema.methods.approveExtension = async function (requestId, adminId) {
   await this.save();
   return this;
 };
+ExchangeSchema.pre("remove", async function (next) {
+  // This runs when an exchange is removed
+  next();
+});
 
 // Reject extension
 ExchangeSchema.methods.rejectExtension = async function (requestId, adminId) {

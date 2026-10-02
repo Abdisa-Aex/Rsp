@@ -939,15 +939,7 @@ const RecentActivity = () => {
             </div>
           )}
 
-          <div className="text-center mt-8">
-            <Link
-              href="/activity"
-              className="inline-flex items-center gap-2 text-green-600 font-semibold hover:gap-3 transition-all"
-            >
-              View All Activity
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
+
         </div>
       </div>
     </section>
@@ -998,16 +990,16 @@ const Testimonials = () => {
         },
         {
           _id: "3",
-          user: { fullName: "Abenezer  ", role: "Student", avatar: "ED" },
+          user: { fullName: "Seid  ", role: "Student", avatar: "ED" },
           rating: 4,
           content:
-            "Borrowed textbooks for my semester and saved over $300. The platform is easy to use and the community is very responsive.",
+            "Exchange scintfic calculator for an exam and saved over $50. The platform is easy to use and the community is very responsive.",
           resource: { title: "College Textbooks" },
           createdAt: new Date().toISOString(),
         },
         {
           _id: "3",
-          user: { fullName: "Seid  ", role: "Student", avatar: "ED" },
+          user: { fullName: "Abenezer  ", role: "Student", avatar: "ED" },
           rating: 4,
           content:
             "Borrowed textbooks for my semester and saved over $300. The platform is easy to use and the community is very responsive.",
@@ -1019,7 +1011,7 @@ const Testimonials = () => {
           user: { fullName: "Hosama  ", role: "Student", avatar: "ED" },
           rating: 4,
           content:
-            "Borrowed textbooks for my semester and saved over $300. The platform is easy to use and the community is very responsive.",
+            "Borrowed Futsal tacketa for the upcoming GC cup and saved over $100. The platform is easy to use and the community is very responsive.",
           resource: { title: "College Textbooks" },
           createdAt: new Date().toISOString(),
         },

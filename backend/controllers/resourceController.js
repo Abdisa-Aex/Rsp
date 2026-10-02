@@ -3,7 +3,7 @@ const User = require("../models/User");
 const Exchange = require("../models/Exchange");
 const Review = require("../models/Review");
 const Notification = require("../models/Notification");
-const Activity = require("../models/Activity"); 
+const Activity = require("../models/Activity");
 const {
   uploadToCloudinary,
   deleteFromCloudinary,
@@ -1036,7 +1036,7 @@ exports.deleteResource = async (req, res) => {
       });
     }
 
-    // Check for active exchanges
+    // ✅ Check for ACTIVE exchanges (prevent deletion of items currently in use)
     const activeExchange = await Exchange.findOne({
       resource: resourceId,
       status: { $in: ["pending", "approved", "active"] },
@@ -1045,11 +1045,23 @@ exports.deleteResource = async (req, res) => {
     if (activeExchange) {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete resource with active exchanges",
+        message:
+          "Cannot delete resource with active exchanges. Please complete or cancel them first.",
       });
     }
 
-    // Delete images from Cloudinary (skip if publicId is undefined)
+    // ✅ NEW: Delete all completed and canceled exchanges (no longer needed)
+    const Exchange = require("../models/Exchange");
+    const deletedExchanges = await Exchange.deleteMany({
+      resource: resourceId,
+      status: { $in: ["completed", "canceled"] },
+    });
+
+    console.log(
+      `✅ Deleted ${deletedExchanges.deletedCount} old exchanges for resource ${resourceId}`,
+    );
+
+    // Delete images from Cloudinary
     if (resource.images && resource.images.length > 0) {
       for (const img of resource.images) {
         if (img && img.publicId) {
@@ -1057,21 +1069,25 @@ exports.deleteResource = async (req, res) => {
             await deleteFromCloudinary(img.publicId);
             console.log(`Deleted image: ${img.publicId}`);
           } catch (cloudinaryError) {
-            console.error(`Failed to delete image ${img.publicId}:`, cloudinaryError.message);
+            console.error(
+              `Failed to delete image ${img.publicId}:`,
+              cloudinaryError.message,
+            );
             // Continue with deletion even if cloudinary fails
           }
         }
       }
     }
 
-    // Soft delete
+    // Soft delete the resource
     resource.status = "deleted";
     resource.deletedAt = new Date();
     await resource.save();
 
     res.json({
       success: true,
-      message: "Resource deleted successfully",
+      message: `Resource deleted successfully. Removed ${deletedExchanges.deletedCount} associated exchanges.`,
+      exchangesDeleted: deletedExchanges.deletedCount,
     });
   } catch (error) {
     console.error("Delete resource error:", error);
@@ -1083,7 +1099,56 @@ exports.deleteResource = async (req, res) => {
     });
   }
 };
+// @desc    Clean up orphaned exchanges (exchanges with no valid resource)
+// @route   POST /api/resources/cleanup
+// @access  Private/Admin
+exports.cleanupOrphanedExchanges = async (req, res) => {
+  try {
+    const Exchange = require("../models/Exchange");
+    const Resource = require("../models/Resource");
 
+    // Get all resource IDs that exist (not soft-deleted)
+    const existingResourceIds = await Resource.find(
+      { status: { $ne: "deleted" } },
+      { _id: 1 }
+    ).distinct('_id');
+
+    // Find exchanges with resources that don't exist
+    const orphanedExchanges = await Exchange.find({
+      resource: { $nin: existingResourceIds }
+    });
+
+    console.log(`Found ${orphanedExchanges.length} orphaned exchanges`);
+
+    // Delete them
+    const result = await Exchange.deleteMany({
+      resource: { $nin: existingResourceIds }
+    });
+
+    // Also clean up exchanges with soft-deleted resources
+    const deletedResources = await Resource.find(
+      { status: "deleted" },
+      { _id: 1 }
+    ).distinct('_id');
+
+    const moreDeleted = await Exchange.deleteMany({
+      resource: { $in: deletedResources }
+    });
+
+    res.json({
+      success: true,
+      message: `Cleaned up ${result.deletedCount + moreDeleted.deletedCount} orphaned exchanges`,
+      stats: {
+        orphanedExchangesFound: orphanedExchanges.length,
+        deletedForMissingResource: result.deletedCount,
+        deletedForSoftDeletedResource: moreDeleted.deletedCount
+      }
+    });
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 // @desc    Request resource
 // @route   POST /api/resources/:resourceId/request
 // @access  Private

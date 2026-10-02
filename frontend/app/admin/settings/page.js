@@ -78,15 +78,7 @@ export default function AdminSettingsPage() {
     contactPhone: "",
     contactAddress: "",
 
-    // Social Links
-    socialLinks: {
-      facebook: "",
-      twitter: "",
-      instagram: "",
-      linkedin: "",
-      youtube: "",
-      github: "",
-    },
+
 
     // Feature Flags
     features: {
@@ -206,7 +198,7 @@ export default function AdminSettingsPage() {
     { id: "pricing", label: "Pricing", icon: DollarSign },
     { id: "security", label: "Security", icon: Lock },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "social", label: "Social Links", icon: Share2 },
+
     { id: "limits", label: "Limits", icon: Activity },
     { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "integrations", label: "Integrations", icon: Server },
@@ -944,88 +936,7 @@ export default function AdminSettingsPage() {
               </div>
             )}
 
-            {/* SOCIAL LINKS */}
-            {activeTab === "social" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold mb-4">
-                  Social Media Links
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <Facebook className="h-5 w-5 text-blue-600" />
-                    <input
-                      type="url"
-                      placeholder="Facebook URL"
-                      value={settings.socialLinks.facebook}
-                      onChange={(e) =>
-                        updateNested("socialLinks.facebook", e.target.value)
-                      }
-                      className="flex-1 px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Twitter className="h-5 w-5 text-blue-400" />
-                    <input
-                      type="url"
-                      placeholder="Twitter URL"
-                      value={settings.socialLinks.twitter}
-                      onChange={(e) =>
-                        updateNested("socialLinks.twitter", e.target.value)
-                      }
-                      className="flex-1 px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Instagram className="h-5 w-5 text-pink-600" />
-                    <input
-                      type="url"
-                      placeholder="Instagram URL"
-                      value={settings.socialLinks.instagram}
-                      onChange={(e) =>
-                        updateNested("socialLinks.instagram", e.target.value)
-                      }
-                      className="flex-1 px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Linkedin className="h-5 w-5 text-blue-700" />
-                    <input
-                      type="url"
-                      placeholder="LinkedIn URL"
-                      value={settings.socialLinks.linkedin}
-                      onChange={(e) =>
-                        updateNested("socialLinks.linkedin", e.target.value)
-                      }
-                      className="flex-1 px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Youtube className="h-5 w-5 text-red-600" />
-                    <input
-                      type="url"
-                      placeholder="YouTube URL"
-                      value={settings.socialLinks.youtube}
-                      onChange={(e) =>
-                        updateNested("socialLinks.youtube", e.target.value)
-                      }
-                      className="flex-1 px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Github className="h-5 w-5 text-gray-800" />
-                    <input
-                      type="url"
-                      placeholder="GitHub URL"
-                      value={settings.socialLinks.github}
-                      onChange={(e) =>
-                        updateNested("socialLinks.github", e.target.value)
-                      }
-                      className="flex-1 px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* LIMITS */}
             {activeTab === "limits" && (

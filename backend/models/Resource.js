@@ -281,6 +281,24 @@ ResourceSchema.pre("save", async function () {
   }
 });
 
+ResourceSchema.pre(
+  "deleteOne",
+  { document: true, query: false },
+  async function () {
+    const Exchange = mongoose.model("Exchange");
+    // Delete all exchanges associated with this resource
+    await Exchange.deleteMany({ resource: this._id });
+    console.log(`Deleted exchanges for resource ${this._id}`);
+  },
+);
+
+// For deleteMany operations
+ResourceSchema.pre("deleteMany", async function () {
+  const Exchange = mongoose.model("Exchange");
+  const resourcesToDelete = await this.model.find(this.getFilter());
+  const resourceIds = resourcesToDelete.map((r) => r._id);
+  await Exchange.deleteMany({ resource: { $in: resourceIds } });
+});
 // Virtual for primary image
 ResourceSchema.virtual("primaryImage").get(function () {
   const primary = this.images.find((img) => img.isPrimary);

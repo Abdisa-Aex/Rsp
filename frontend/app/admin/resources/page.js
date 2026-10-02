@@ -256,6 +256,7 @@ export default function AdminResourcesPage() {
       });
       const data = await apiCall(`/admin/resources?${params.toString()}`);
       if (data.success) {
+        console.log("Loaded resources:", data.resources);
         setResources(data.resources);
         setTotalPages(data.pagination.pages);
         setTotalResources(data.pagination.total);
@@ -267,10 +268,11 @@ export default function AdminResourcesPage() {
     }
   };
 
+  // FIXED: Use resource._id instead of resource.id
   const handleApprove = async (resource) => {
     setActionLoading(true);
     try {
-      const data = await apiCall(`/admin/resources/${resource.id}/moderate`, {
+      const data = await apiCall(`/admin/resources/${resource._id}/moderate`, {
         method: "POST",
         body: JSON.stringify({ action: "approve" }),
       });
@@ -284,6 +286,7 @@ export default function AdminResourcesPage() {
     }
   };
 
+  // FIXED: Use selectedResource._id instead of selectedResource.id
   const handleReject = async () => {
     if (!rejectReason.trim()) {
       alert("Please provide a reason for rejection");
@@ -293,7 +296,7 @@ export default function AdminResourcesPage() {
     setActionLoading(true);
     try {
       const data = await apiCall(
-        `/admin/resources/${selectedResource.id}/moderate`,
+        `/admin/resources/${selectedResource._id}/moderate`,
         {
           method: "POST",
           body: JSON.stringify({ action: "reject", reason: rejectReason }),
@@ -312,18 +315,22 @@ export default function AdminResourcesPage() {
     }
   };
 
+  // FIXED: Use resource._id instead of resource.id
   const handleDelete = async (resource) => {
     if (confirm(`Are you sure you want to delete "${resource.title}"?`)) {
       setActionLoading(true);
       try {
-        const data = await apiCall(`/admin/resources/${resource.id}`, {
+        const data = await apiCall(`/admin/resources/${resource._id}`, {
           method: "DELETE",
         });
         if (data.success) {
           loadResources();
+        } else {
+          alert(data.message || "Failed to delete resource");
         }
       } catch (error) {
         console.error("Delete error:", error);
+        alert(error.message || "An error occurred while deleting");
       } finally {
         setActionLoading(false);
       }
@@ -512,9 +519,10 @@ export default function AdminResourcesPage() {
                       </td>
                     </tr>
                   ) : (
+                    // FIXED: Use resource._id as key
                     resources.map((resource) => (
                       <ResourceRow
-                        key={resource.id}
+                        key={resource._id}
                         resource={resource}
                         onApprove={handleApprove}
                         onReject={(resource) => {
@@ -522,8 +530,9 @@ export default function AdminResourcesPage() {
                           setShowRejectModal(true);
                         }}
                         onDelete={handleDelete}
+                        // FIXED: Use resource._id in URL
                         onViewDetails={(resource) =>
-                          router.push(`/admin/resources/${resource.id}`)
+                          router.push(`/admin/resources/${resource._id}`)
                         }
                       />
                     ))

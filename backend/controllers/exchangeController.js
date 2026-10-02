@@ -6,8 +6,55 @@ const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { logger } = require("../utils/logger");
 const Activity = require("../models/Activity");
-// const Resource = require("../models/Resource"); 
-// const Activity = require("../models/Activity"); 
+
+
+// @desc    Send message in exchange
+// @route   POST /api/exchanges/:id/messages
+// @access  Private
+exports.sendExchangeMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    const exchange = await Exchange.findById(id);
+    if (!exchange) {
+      return res.status(404).json({ success: false, message: "Exchange not found" });
+    }
+
+    // Check if user is part of this exchange
+    if (exchange.owner.toString() !== req.user.id && exchange.borrower.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    // Determine recipient
+    const recipientId = exchange.owner.toString() === req.user.id ? exchange.borrower : exchange.owner;
+
+    // ✅ FIXED: Use valid priority values based on your Notification model
+    // Try one of these options:
+
+    // Option 1: Use "normal" instead of "medium"
+    await Notification.create({
+      user: recipientId,
+      type: "message",
+      title: "New Message",
+      message: `${req.user.fullName}: ${message.substring(0, 100)}`,
+      data: { exchangeId: exchange._id },
+      priority: "normal",  // ← Changed from "medium" to "normal"
+      actionUrl: `/exchanges/${exchange._id}`,
+    });
+
+    // Option 2: If your model uses "low", "medium", "high" - keep as is
+    // Option 3: If your model uses only "low", "high" - use "high"
+
+    res.json({ success: true, message: "Message sent successfully" });
+  } catch (error) {
+    logger.error("Send exchange message error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// const Resource = require("../models/Resource");
+// const Activity = require("../models/Activity");
 // @desc    Get all exchanges for current user
 // @route   GET /api/exchanges
 // @access  Private
@@ -64,7 +111,38 @@ exports.getExchangeById = async (req, res) => {
       .json({ success: false, message: "Failed to fetch exchange" });
   }
 };
+// @desc    Delete exchange
+// @route   DELETE /api/exchanges/:id
+// @access  Private
+exports.deleteExchange = async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    const exchange = await Exchange.findById(id);
+    if (!exchange) {
+      return res.status(404).json({ success: false, message: "Exchange not found" });
+    }
+
+    // Check if user is authorized (owner or borrower)
+    if (exchange.owner.toString() !== req.user.id && exchange.borrower.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    // ✅ MODIFIED: Allow deletion for pending, canceled, OR completed
+    if (exchange.status !== "pending" && exchange.status !== "canceled" && exchange.status !== "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete active exchanges"
+      });
+    }
+
+    await Exchange.findByIdAndDelete(id);
+
+    res.json({ success: true, message: "Exchange deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 // @desc    Update exchange status
 // @route   PUT /api/exchanges/:id/status
 // @access  Private
@@ -93,38 +171,38 @@ exports.updateExchangeStatus = async (req, res) => {
     });
 
     // === PERMISSION CHECKS ===
-    
+
     if (status === "approved" && !isOwner) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Only the item owner can approve requests" 
+      return res.status(403).json({
+        success: false,
+        message: "Only the item owner can approve requests"
       });
     }
 
     if (status === "canceled" && !isOwner && !isBorrower) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Not authorized to cancel this exchange" 
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to cancel this exchange"
       });
     }
 
     if (status === "active" && !isOwner) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Only owner can activate exchange" 
+      return res.status(403).json({
+        success: false,
+        message: "Only owner can activate exchange"
       });
     }
 
     if (status === "completed" && !isOwner && !isBorrower) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Not authorized to complete this exchange" 
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to complete this exchange"
       });
     }
 
     // === UPDATE STATUS ===
     exchange.status = status;
-    
+
     if (status === "approved") exchange.approvedAt = new Date();
     if (status === "active") exchange.activatedAt = new Date();
     if (status === "completed") exchange.completedAt = new Date();
@@ -132,13 +210,13 @@ exports.updateExchangeStatus = async (req, res) => {
 
     await exchange.save();
 
-    // === SEND NOTIFICATION ===
+    // ✅ === SEND NOTIFICATION ===
     const recipientId = isOwner ? exchange.borrower : exchange.owner;
     const resourceTitle = exchange.resource?.title || "item";
-    
+
     let notificationTitle = "";
     let notificationMessage = "";
-    
+
     if (status === "approved") {
       notificationTitle = "Request Approved";
       notificationMessage = `${req.user.fullName} approved your request to borrow "${resourceTitle}"`;
@@ -150,37 +228,64 @@ exports.updateExchangeStatus = async (req, res) => {
       notificationMessage = `Your exchange has been ${status}`;
     }
 
-    // ✅ FIXED: Use "request" type instead of "exchange"
     await Notification.create({
       user: recipientId,
-      type: "request",  // ← Changed from "exchange" to "request"
+      type: "request",
       title: notificationTitle,
       message: notificationMessage,
       data: { exchangeId: exchange._id, status },
       priority: "high",
     });
 
+    // ✅ === EMIT SOCKET EVENTS FOR REAL-TIME UPDATES ===
+    const io = req.app.get("io");
+    if (io) {
+      // Emit exchange update
+      io.emit("exchange-updated", {
+        exchangeId: exchange._id,
+        newStatus: status,
+        itemId: exchange.resource,
+        itemTitle: resourceTitle,
+        itemStatus: status === "active" ? "borrowed" : status === "completed" ? "available" : null,
+      });
+
+      // Emit resource status change for Browse page
+      if (status === "active") {
+        io.emit("resource-status-changed", {
+          resourceId: exchange.resource,
+          status: "borrowed",
+          title: resourceTitle,
+        });
+      } else if (status === "completed") {
+        io.emit("resource-status-changed", {
+          resourceId: exchange.resource,
+          status: "available",
+          title: resourceTitle,
+        });
+      }
+
+      console.log(`📡 Socket emitted: resource-status-changed for ${resourceTitle} -> ${status === "active" ? "borrowed" : "available"}`);
+    }
+
     logger.info(`Exchange ${exchange._id} status updated to ${status} by ${req.user.id}`);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       exchange,
-      message: status === "approved" ? "Request approved successfully" : 
-               status === "canceled" ? "Request declined successfully" : 
+      message: status === "approved" ? "Request approved successfully" :
+               status === "canceled" ? "Request declined successfully" :
                "Exchange status updated"
     });
-    
+
   } catch (error) {
     logger.error("Update exchange status error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Failed to update exchange" 
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update exchange"
     });
   }
 };
-
 // ==================== RETURN EXCHANGE ====================
-
 // @desc    Return an item (complete exchange)
 // @route   POST /api/exchanges/:id/return
 // @access  Private
@@ -245,13 +350,35 @@ exports.returnExchange = async (req, res) => {
 
     // ✅ FIXED: Notify owner correctly
     await Notification.create({
-      user: exchange.owner,  // ← Use exchange.owner directly
-      type: "return",        // ← Use "return" type
+      user: exchange.owner,
+      type: "return",
       title: "Item Returned",
       message: `${req.user.fullName} has returned "${resource.title}"`,
       data: { exchangeId: exchange._id },
       priority: "high",
     });
+
+    // ✅ === EMIT SOCKET EVENTS FOR REAL-TIME UPDATES ===
+    const io = req.app.get("io");
+    if (io) {
+      // Emit exchange update for dashboard
+      io.emit("exchange-updated", {
+        exchangeId: exchange._id,
+        newStatus: "completed",
+        itemId: exchange.resource,
+        itemTitle: resource.title,
+        itemStatus: "available",
+      });
+
+      // Emit resource status change for Browse page
+      io.emit("resource-status-changed", {
+        resourceId: exchange.resource,
+        status: "available",
+        title: resource.title,
+      });
+
+      console.log(`📡 Socket emitted: resource-status-changed for ${resource.title} -> available`);
+    }
 
     logger.info(`Exchange ${id} returned by ${req.user.id}`);
     res.json({ success: true, message: "Item returned successfully" });
@@ -272,9 +399,7 @@ exports.rateExchange = async (req, res) => {
     const { rating, review, tags, isPublic } = req.body;
 
     if (!rating || rating < 1 || rating > 5) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid rating" });
+      return res.status(400).json({ success: false, message: "Invalid rating" });
     }
 
     const exchange = await Exchange.findById(id)
@@ -283,39 +408,26 @@ exports.rateExchange = async (req, res) => {
       .populate("borrower", "fullName email");
 
     if (!exchange) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Exchange not found" });
+      return res.status(404).json({ success: false, message: "Exchange not found" });
     }
 
-    // Check if user is part of this exchange
     const isOwner = exchange.owner._id.toString() === req.user.id;
     const isBorrower = exchange.borrower._id.toString() === req.user.id;
 
     if (!isOwner && !isBorrower) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Not authorized" });
+      return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // Check if exchange is completed
     if (exchange.status !== "completed") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Exchange must be completed first" });
+      return res.status(400).json({ success: false, message: "Exchange must be completed first" });
     }
 
     // Check if already rated
-    if (
-      (isOwner && exchange.ownerRating) ||
-      (!isOwner && exchange.borrowerRating)
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Already rated this exchange" });
+    if ((isOwner && exchange.ownerRating) || (!isOwner && exchange.borrowerRating)) {
+      return res.status(400).json({ success: false, message: "Already rated this exchange" });
     }
 
-    // Add rating to exchange
+    // Add rating
     if (isOwner) {
       exchange.ownerRating = rating;
       exchange.ownerReview = review;
@@ -329,10 +441,10 @@ exports.rateExchange = async (req, res) => {
     }
     await exchange.save();
 
-    // Award points for writing review (50 points)
+    // Award points
     await User.findByIdAndUpdate(req.user.id, { $inc: { points: 50 } });
 
-    // Create review in Review collection
+    // Create review
     const Review = require("../models/Review");
     await Review.create({
       exchange: exchange._id,
@@ -340,7 +452,7 @@ exports.rateExchange = async (req, res) => {
       reviewer: req.user.id,
       reviewee: isOwner ? exchange.borrower._id : exchange.owner._id,
       rating,
-      review,
+      review: review || "",
       tags: tags || [],
       isPublic: isPublic !== false,
     });
@@ -348,28 +460,39 @@ exports.rateExchange = async (req, res) => {
     // Update reviewee's average rating
     const revieweeId = isOwner ? exchange.borrower._id : exchange.owner._id;
     const allReviews = await Review.find({ reviewee: revieweeId });
-    const avgRating =
-      allReviews.length > 0
-        ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
-        : rating;
+    const avgRating = allReviews.length > 0
+      ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
+      : rating;
+
     await User.findByIdAndUpdate(revieweeId, {
       rating: avgRating,
       totalRatings: allReviews.length,
       $inc: { points: 25 },
     });
 
-    // Create notification for the other party
+    // Create notification
     await Notification.create({
       user: isOwner ? exchange.borrower._id : exchange.owner._id,
       type: "review",
       title: "New Review",
       message: `${req.user.fullName} left you a ${rating}-star review`,
       data: { exchangeId: exchange._id, rating },
-      priority: "medium",
+      priority: "normal",
       actionUrl: `/exchanges/${exchange._id}`,
     });
 
-    logger.info(`Exchange ${id} rated by ${req.user.id} with ${rating} stars`);
+    // ✅ EMIT SOCKET EVENT FOR REAL-TIME UPDATE
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("exchange-rated", {
+        exchangeId: exchange._id,
+        ratedBy: req.user.id,
+        rating: rating,
+        ownerRating: exchange.ownerRating,
+        borrowerRating: exchange.borrowerRating,
+      });
+      console.log(`📡 Socket emitted: exchange-rated for ${exchange._id}`);
+    }
 
     res.json({
       success: true,
@@ -388,7 +511,7 @@ exports.completeExchange = async (req, res) => {
   try {
     const { id } = req.params;
     const { rating, review, condition } = req.body;
-    
+
     const exchange = await Exchange.findById(id);
     if (!exchange) {
       return res.status(404).json({ success: false, message: "Exchange not found" });
@@ -407,7 +530,7 @@ exports.completeExchange = async (req, res) => {
     if (rating && review) {
       const Review = require("../models/Review");
       const isOwner = exchange.owner.toString() === req.user.id;
-      
+
       await Review.create({
         exchange: exchange._id,
         resource: exchange.resource,

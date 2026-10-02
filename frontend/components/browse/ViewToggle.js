@@ -1,6 +1,6 @@
 "use client";
 
-import { Grid3x3, List, Map } from "lucide-react";
+import { Grid3x3, List, Map, ZoomIn } from "lucide-react";
 
 const ViewToggle = ({ viewMode, onViewChange }) => {
   return (
@@ -37,6 +37,17 @@ const ViewToggle = ({ viewMode, onViewChange }) => {
         title="Map view"
       >
         <Map className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => onViewChange("zoomable")}
+        className={`p-2 rounded-lg transition-all ${
+          viewMode === "zoomable"
+            ? "bg-white dark:bg-gray-700 shadow-sm text-green-600 dark:text-green-400"
+            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+        }`}
+        title="Zoomable view - Zoom in/out on items"
+      >
+        <ZoomIn className="h-4 w-4" />
       </button>
     </div>
   );

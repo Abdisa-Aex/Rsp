@@ -190,7 +190,7 @@ exports.deleteBadge = async (req, res) => {
 exports.exportAllData = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     // Fetch all user data
     const user = await User.findById(userId).select("-password -refreshTokens -verificationCode -twoFactorSecret -magicToken");
     const resources = await Resource.find({ owner: userId });
@@ -199,10 +199,10 @@ exports.exportAllData = async (req, res) => {
     });
     const reviews = await Review.find({ reviewer: userId });
     const notifications = await Notification.find({ user: userId });
-    
+
     // Get wishlist items
     const wishlistItems = await Resource.find({ _id: { $in: user.wishlist || [] } });
-    
+
     const exportData = {
       version: "2.0.0",
       exportedAt: new Date().toISOString(),
@@ -264,7 +264,7 @@ exports.exportAllData = async (req, res) => {
         price: w.price,
       })),
     };
-    
+
     res.json({
       success: true,
       data: exportData,
@@ -286,16 +286,16 @@ exports.importData = async (req, res) => {
   try {
     const { data } = req.body;
     const userId = req.user.id;
-    
+
     if (!data || !data.version) {
       return res.status(400).json({
         success: false,
         message: "Invalid backup data",
       });
     }
-    
+
     let importedCount = 0;
-    
+
     // Import resources
     if (data.resources && data.resources.length > 0) {
       for (const resource of data.resources) {
@@ -304,7 +304,7 @@ exports.importData = async (req, res) => {
           title: resource.title,
           owner: userId
         });
-        
+
         if (!existingResource) {
           const newResource = new Resource({
             ...resource,
@@ -317,7 +317,7 @@ exports.importData = async (req, res) => {
         }
       }
     }
-    
+
     // Import preferences
     if (data.user && data.user.preferences) {
       await User.findByIdAndUpdate(userId, {
@@ -334,7 +334,7 @@ exports.importData = async (req, res) => {
         }
       });
     }
-    
+
     res.json({
       success: true,
       message: `Data imported successfully. Imported ${importedCount} items.`,
@@ -358,21 +358,21 @@ exports.importData = async (req, res) => {
 exports.resetUserData = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     // Delete all user resources
     await Resource.deleteMany({ owner: userId });
-    
+
     // Delete all exchanges involving user
     await Exchange.deleteMany({
       $or: [{ owner: userId }, { borrower: userId }]
     });
-    
+
     // Delete all reviews by user
     await Review.deleteMany({ reviewer: userId });
-    
+
     // Delete all notifications for user
     await Notification.deleteMany({ user: userId });
-    
+
     // Reset user stats and wishlist
     await User.findByIdAndUpdate(userId, {
       $set: {
@@ -395,9 +395,9 @@ exports.resetUserData = async (req, res) => {
         },
       }
     });
-    
+
     logger.info(`User ${userId} reset all data`);
-    
+
     res.json({
       success: true,
       message: "All data has been reset successfully",
@@ -1033,12 +1033,22 @@ exports.featureResource = async (req, res) => {
   }
 };
 
+// In adminController.js, update the deleteResource function:
+
 // @desc    Delete resource (admin)
 // @route   DELETE /api/admin/resources/:resourceId
 // @access  Private/Admin
 exports.deleteResource = async (req, res) => {
   try {
     const { resourceId } = req.params;
+
+    // Validate resourceId
+    if (!resourceId || !resourceId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid resource ID format",
+      });
+    }
 
     const resource = await Resource.findById(resourceId);
     if (!resource) {
@@ -1048,25 +1058,58 @@ exports.deleteResource = async (req, res) => {
       });
     }
 
-    // Delete images from Cloudinary
-    const { deleteFromCloudinary } = require("../services/cloudinary");
-    for (const img of resource.images) {
-      await deleteFromCloudinary(img.publicId);
+    // Check for active exchanges before deleting
+    const activeExchange = await Exchange.findOne({
+      resource: resourceId,
+      status: { $in: ["pending", "approved", "active"] },
+    });
+
+    if (activeExchange) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete resource with active exchanges. Please complete or cancel them first.",
+      });
     }
 
+    // Delete images from Cloudinary if they exist
+    if (resource.images && resource.images.length > 0) {
+      const { deleteFromCloudinary } = require("../services/cloudinary");
+      for (const img of resource.images) {
+        if (img && img.publicId) {
+          try {
+            await deleteFromCloudinary(img.publicId);
+          } catch (cloudinaryError) {
+            console.error(`Failed to delete image ${img.publicId}:`, cloudinaryError.message);
+            // Continue with deletion even if cloudinary fails
+          }
+        }
+      }
+    }
+
+    // Delete related exchanges (completed/canceled ones)
+    await Exchange.deleteMany({
+      resource: resourceId,
+      status: { $in: ["completed", "canceled"] },
+    });
+
+    // Delete the resource
     await resource.deleteOne();
 
-    logger.info(`Resource ${resourceId} deleted by ${req.user.id}`);
+    // Log the action
+    logger.info(`Resource ${resourceId} (${resource.title}) deleted by admin ${req.user.id}`);
 
+    // Return consistent response format
     res.json({
       success: true,
       message: "Resource deleted successfully",
+      deletedResourceId: resourceId,
     });
   } catch (error) {
     logger.error(`Delete resource error: ${error.message}`);
+    console.error("Delete error details:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to delete resource",
+      message: error.message || "Failed to delete resource",
     });
   }
 };

@@ -26,42 +26,42 @@ const UserActions = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  // const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const profileMenuRef = useRef(null);
   const notificationsRef = useRef(null);
 
-  useEffect(() => {
-    // Load mock notifications
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNotifications([
-      {
-        id: 1,
-        title: "New Message",
-        message: "Sarah sent you a message",
-        time: "5 min ago",
-        read: false,
-        type: "message",
-      },
-      {
-        id: 2,
-        title: "Request Approved",
-        message: "Your request for Power Drill was approved",
-        time: "1 hour ago",
-        read: false,
-        type: "request",
-      },
-      {
-        id: 3,
-        title: "Item Returned",
-        message: "Mike returned your camera",
-        time: "2 hours ago",
-        read: true,
-        type: "return",
-      },
-    ]);
-    setUnreadCount(2);
-  }, []);
+  // useEffect(() => {
+  //   // Load mock notifications
+  //   // eslint-disable-next-line react-hooks/set-state-in-effect
+  //   setNotifications([
+  //     {
+  //       id: 1,
+  //       title: "New Message",
+  //       message: "Sarah sent you a message",
+  //       time: "5 min ago",
+  //       read: false,
+  //       type: "message",
+  //     },
+  //     {
+  //       id: 2,
+  //       title: "Request Approved",
+  //       message: "Your request for Power Drill was approved",
+  //       time: "1 hour ago",
+  //       read: false,
+  //       type: "request",
+  //     },
+  //     {
+  //       id: 3,
+  //       title: "Item Returned",
+  //       message: "Mike returned your camera",
+  //       time: "2 hours ago",
+  //       read: true,
+  //       type: "return",
+  //     },
+  //   ]);
+  //   setUnreadCount(2);
+  // }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -88,17 +88,17 @@ const UserActions = () => {
     router.push("/");
   };
 
-  const markAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
+  // const markAsRead = (id) => {
+  //   setNotifications((prev) =>
+  //     prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+  //   );
+  //   setUnreadCount((prev) => Math.max(0, prev - 1));
+  // };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
-  };
+  // const markAllAsRead = () => {
+  //   setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  //   setUnreadCount(0);
+  // };
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -110,8 +110,8 @@ const UserActions = () => {
       label: "Exchanges",
       href: "/dashboard?tab=exchanges",
     },
-    { icon: Star, label: "Favorites", href: "/favorites" },
-    { icon: CreditCard, label: "Billing", href: "/billing" },
+    // { icon: Star, label: "Favorites", href: "/favorites" },
+    // { icon: CreditCard, label: "Billing", href: "/billing" },
     { icon: Settings, label: "Settings", href: "/settings" },
     { icon: HelpCircle, label: "Help", href: "/help" },
   ];
@@ -139,7 +139,7 @@ const UserActions = () => {
     <div className="flex items-center gap-2">
       {/* Notifications */}
       <div className="relative" ref={notificationsRef}>
-        <button
+        {/* <button
           onClick={() => setShowNotifications(!showNotifications)}
           className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           aria-label="Notifications"
@@ -150,9 +150,9 @@ const UserActions = () => {
               {unreadCount}
             </span>
           )}
-        </button>
+        </button> */}
 
-        <AnimatePresence>
+        {/* <AnimatePresence>
           {showNotifications && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -162,14 +162,14 @@ const UserActions = () => {
             >
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                  Notifications
+                  Notifications pop
                 </h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}
                     className="text-xs text-green-600 hover:text-green-700"
                   >
-                    Mark all read
+                    Mark all read poped
                   </button>
                 )}
               </div>
@@ -207,7 +207,7 @@ const UserActions = () => {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
       </div>
 
       {/* User Menu */}

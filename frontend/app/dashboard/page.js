@@ -1,42 +1,35 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import { useSocket } from "@/context/SocketContext";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useSocket } from "@/hooks";
+
 import { useNotifications } from "@/hooks";
 import { useLocalStorage } from "@/hooks";
-import { QrReader } from "react-qr-reader";
+import AddItemModal from "components/modals/AddItemModal";
 import { useDebounce } from "@/hooks";
+// import ItemsGrid from "components/profile/ItemsGrid";
 import {
   LayoutDashboard,
-  Wrench,
-  BarChart3,
   Package,
   Handshake,
-  MessageSquare,
   CalendarDays,
   TrendingUp,
-  Award,
   Bell,
-  Search,
-  Settings,
   LogOut,
   ChevronDown,
   ChevronRight,
   Plus,
   Star,
-  QrCode,
-  Gift,
   Sparkles,
   Sun,
   Moon,
-  Users,
-  BookOpen,
-  Laptop,
-  Camera,
-  DollarSign,
-  Shield,
-  Trophy,
   Flame,
   Eye,
   AlertCircle,
@@ -65,17 +58,20 @@ import {
   CheckCircle2,
   Loader2,
   CheckSquare,
-  Coins,
-  Leaf,
-  Copy,
 } from "lucide-react";
+import ItemsGrid from "components/profile/ItemsGrid";
+
 import Facebook from "react-feather";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import AnnouncementBar from "@/components/layout/AnnouncementBar";
-import StatCard from "@/components/dashboard/StatCard";
-import ActivityFeed from "@/components/dashboard/ActivityFeed";
+// import ItemsGrid from "components/profile/ItemsGrid";
+import ExchangesList from "components/profile/ExchangesList";
+import ReviewList from "components/profile/ReviewList";
+import NotificationsList from "components/profile/NotificationsList";
 import toast, { Toaster } from "react-hot-toast";
+import { Camera } from "lucide-react";
+import { Search } from "lucide-react";
 
 // ============ CONSTANTS (Keep ALL your header colors) ============
 const headerColors = {
@@ -317,148 +313,69 @@ const ConfirmDialog = ({
   );
 };
 
-const AddItemModal = ({ isOpen, onClose, onAdd }) => {
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "Books",
-    subcategory: "Textbook",
-    description: "",
-    condition: "Good",
-    location: "Campus Library",
-    availableFrom: new Date().toISOString().split("T")[0],
-    availableUntil: "",
-    price: 0,
-    deposit: 0,
-    tags: [],
-    image: null,
-  });
-  const [imagePreview, setImagePreview] = useState(null);
-  const [tagInput, setTagInput] = useState("");
+// Complete Rating Modal Component - Add this before the return statement
+const RatingModal = ({ isOpen, onClose, exchange, onSubmit, currentUser }) => {
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [review, setReview] = useState("");
+  const [tags, setTags] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(false);
-  const [errors, setErrors] = useState({});
 
-  const categories = {
-    Books: ["Textbook", "Novel", "Reference", "Magazine", "Comic"],
-    Electronics: [
-      "Laptop",
-      "Phone",
-      "Tablet",
-      "Headphones",
-      "Camera",
-      "Charger",
-    ],
-    Tools: ["Drill", "Saw", "Hammer", "Wrench", "Screwdriver", "Measuring"],
-    Sports: ["Ball", "Racket", "Gear", "Equipment", "Apparel", "Fitness"],
-    Clothing: ["Shirt", "Pants", "Jacket", "Shoes", "Accessories", "Uniform"],
-    Furniture: ["Chair", "Desk", "Lamp", "Shelf", "Bed", "Storage"],
-    Other: ["Misc", "Art", "Music", "Game", "Food", "Pet"],
-  };
+  const ratingTags = [
+    "Friendly owner",
+    "Item as described",
+    "Fast pickup",
+    "Good condition",
+    "Would recommend",
+    "On time return",
+    "Great communication",
+    "Clean item",
+  ];
 
-  const conditions = ["Like New", "Very Good", "Good", "Fair", "Acceptable"];
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = "Item name is required";
-    if (formData.price < 0) newErrors.price = "Price cannot be negative";
-    if (formData.deposit < 0) newErrors.deposit = "Deposit cannot be negative";
-    if (
-      formData.availableFrom &&
-      formData.availableUntil &&
-      new Date(formData.availableFrom) > new Date(formData.availableUntil)
-    ) {
-      newErrors.dates =
-        "Available from date must be before available until date";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB");
-        return;
-      }
-      setIsImageLoading(true);
-      setFormData({ ...formData, image: file });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-        setIsImageLoading(false);
-      };
-      reader.onerror = () => {
-        alert("Error loading image");
-        setIsImageLoading(false);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const addTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData({ ...formData, tags: [...formData.tags, tagInput.trim()] });
-      setTagInput("");
-    }
-  };
-
-  const removeTag = (tag) => {
-    setFormData({ ...formData, tags: formData.tags.filter((t) => t !== tag) });
+  const toggleTag = (tag) => {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const newItem = {
-      id: generateId(),
-      name: formData.name,
-      category: formData.category,
-      subcategory: formData.subcategory,
-      description: formData.description,
-      condition: formData.condition,
-      location: formData.location,
-      availableFrom: formData.availableFrom,
-      availableUntil: formData.availableUntil,
-      price: formData.price,
-      deposit: formData.deposit,
-      tags: formData.tags,
-      image: imagePreview,
-      status: "Available",
-      requests: 0,
-      rating: 0,
-      createdAt: new Date().toISOString(),
-    };
-    onAdd(newItem);
+    await onSubmit(exchange, { rating, review, tags });
     setIsSubmitting(false);
     onClose();
-    setFormData({
-      name: "",
-      category: "Books",
-      subcategory: "Textbook",
-      description: "",
-      condition: "Good",
-      location: "Campus Library",
-      availableFrom: new Date().toISOString().split("T")[0],
-      availableUntil: "",
-      price: 0,
-      deposit: 0,
-      tags: [],
-      image: null,
-    });
-    setImagePreview(null);
-    setTagInput("");
-    setErrors({});
   };
 
   if (!isOpen) return null;
+
+  // ✅ Add null check for exchange
+  if (!exchange) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+          <p className="text-center text-red-500">
+            Error loading exchange data
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full py-2 bg-gray-500 text-white rounded-lg"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Determine the other user for display
+  const isOwner = currentUser?._id === exchange?.owner?._id;
+  const otherUser = isOwner ? exchange?.borrower : exchange?.owner;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Share New Item
+            Rate Your Experience
           </h3>
           <button
             onClick={onClose}
@@ -467,271 +384,100 @@ const AddItemModal = ({ isOpen, onClose, onAdd }) => {
             <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
+
         <div className="space-y-4">
+          {/* Exchange Info */}
+          <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <p className="text-sm font-medium">
+              {exchange?.resource?.title || "Item"}
+            </p>
+            <p className="text-xs text-gray-500">
+              with {otherUser?.fullName || otherUser?.name || "User"}
+            </p>
+          </div>
+
+          {/* Stars */}
+          <div className="text-center">
+            <div className="flex justify-center gap-2 mb-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRating(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  className="focus:outline-none transition-transform hover:scale-110"
+                >
+                  <Star
+                    className={`h-8 w-8 ${
+                      (hoverRating || rating) >= star
+                        ? "text-yellow-500 fill-yellow-500"
+                        : "text-gray-300"
+                    } transition-colors`}
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-sm text-gray-600">
+              {rating === 5 && "Excellent! 🌟"}
+              {rating === 4 && "Very Good 👍"}
+              {rating === 3 && "Good 👌"}
+              {rating === 2 && "Fair 😕"}
+              {rating === 1 && "Poor 😞"}
+            </p>
+          </div>
+
+          {/* Review Text */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Item Name *
-            </label>
-            <input
-              type="text"
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 ${errors.name ? "border-red-500" : ""}`}
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              placeholder="e.g., Calculus Textbook"
-            />
-            {errors.name && (
-              <p className="text-xs text-red-500 mt-1">{errors.name}</p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Category</label>
-              <select
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    category: e.target.value,
-                    subcategory: categories[e.target.value]?.[0] || "",
-                  })
-                }
-              >
-                {Object.keys(categories).map((cat) => (
-                  <option key={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Subcategory
-              </label>
-              <select
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={formData.subcategory}
-                onChange={(e) =>
-                  setFormData({ ...formData, subcategory: e.target.value })
-                }
-              >
-                {categories[formData.category]?.map((sub) => (
-                  <option key={sub}>{sub}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Description
+              Your Review
             </label>
             <textarea
               rows="3"
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Describe your item in detail..."
+              value={review}
+              onChange={(e) => setReview(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+              placeholder="Share your experience..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Condition
-              </label>
-              <select
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={formData.condition}
-                onChange={(e) =>
-                  setFormData({ ...formData, condition: e.target.value })
-                }
-              >
-                {conditions.map((cond) => (
-                  <option key={cond}>{cond}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Location</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={formData.location}
-                onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Available From
-              </label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={formData.availableFrom}
-                onChange={(e) =>
-                  setFormData({ ...formData, availableFrom: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Available Until (Optional)
-              </label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={formData.availableUntil}
-                onChange={(e) =>
-                  setFormData({ ...formData, availableUntil: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          {errors.dates && (
-            <p className="text-xs text-red-500">{errors.dates}</p>
-          )}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Rental Price ($/day)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 ${errors.price ? "border-red-500" : ""}`}
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    price: parseFloat(e.target.value) || 0,
-                  })
-                }
-              />
-              {errors.price && (
-                <p className="text-xs text-red-500 mt-1">{errors.price}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Security Deposit ($)
-              </label>
-              <input
-                type="number"
-                min="0"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 ${errors.deposit ? "border-red-500" : ""}`}
-                value={formData.deposit}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    deposit: parseFloat(e.target.value) || 0,
-                  })
-                }
-              />
-              {errors.deposit && (
-                <p className="text-xs text-red-500 mt-1">{errors.deposit}</p>
-              )}
-            </div>
-          </div>
+
+          {/* Quick Tags */}
           <div>
-            <label className="block text-sm font-medium mb-2">Tags</label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && addTag()}
-                placeholder="Add tags (e.g., textbook, study)"
-              />
-              <button
-                onClick={addTag}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200"
-              >
-                Add
-              </button>
-            </div>
+            <label className="block text-sm font-medium mb-2">Quick Tags</label>
             <div className="flex flex-wrap gap-2">
-              {formData.tags.map((tag) => (
-                <span
+              {ratingTags.map((tag) => (
+                <button
                   key={tag}
-                  className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg text-sm flex items-center gap-1"
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className={`px-2 py-1 rounded-full text-xs transition-colors ${
+                    tags.includes(tag)
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
                 >
-                  #{tag}
-                  <button
-                    onClick={() => removeTag(tag)}
-                    className="hover:text-red-500"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
+                  {tag}
+                </button>
               ))}
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Item Image</label>
-            <div className="flex items-center gap-4">
-              <label className="cursor-pointer px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
-                <span className="text-sm">Choose Image</span>
-              </label>
-              {isImageLoading && (
-                <div className="h-16 w-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-                </div>
-              )}
-              {imagePreview && !isImageLoading && (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="h-16 w-16 object-cover rounded-lg"
-                  />
-                  <button
-                    onClick={() => {
-                      setImagePreview(null);
-                      setFormData({ ...formData, image: null });
-                    }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Max size: 5MB. JPG, PNG, GIF supported.
-            </p>
-          </div>
+
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
           >
             {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
             ) : (
-              <Plus className="h-4 w-4" />
+              "Submit Rating"
             )}
-            {isSubmitting ? "Sharing..." : "Share Item"}
           </button>
         </div>
       </div>
     </div>
   );
 };
-
 const RequestItemModal = ({ isOpen, onClose, item, onRequest }) => {
   const [message, setMessage] = useState("");
   const [pickupDate, setPickupDate] = useState("");
@@ -1052,259 +798,6 @@ const ReturnItemModal = ({ isOpen, onClose, exchange, onReturn }) => {
   );
 };
 
-const SettingsModal = ({
-  isOpen,
-  onClose,
-  darkMode,
-  onDarkModeToggle,
-  user,
-  onUpdateUser,
-  onOpenDataManagement,
-}) => {
-  const [formData, setFormData] = useState(user);
-  const [notifications, setNotifications] = useState({
-    push: true,
-    email: true,
-    sms: false,
-    itemRequests: true,
-    returns: true,
-    promotions: false,
-    wishlistUpdates: true,
-  });
-  const [privacy, setPrivacy] = useState({
-    profileVisibility: "public",
-    showEmail: false,
-    showPhone: false,
-    showWishlist: true,
-  });
-  const [language, setLanguage] = useState("english");
-  const [isSaving, setIsSaving] = useState(false);
-  const handleSave = async () => {
-    setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    onUpdateUser(formData);
-    setIsSaving(false);
-    onClose();
-  };
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Settings
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="space-y-6">
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-4 rounded-xl">
-            <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
-              Profile Information
-            </h4>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Name"
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 focus:ring-2 focus:ring-green-500"
-                value={formData?.name || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 focus:ring-2 focus:ring-green-500"
-                value={formData?.email || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-              />
-              <input
-                type="text"
-                placeholder="Major"
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 focus:ring-2 focus:ring-green-500"
-                value={formData?.major || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, major: e.target.value })
-                }
-              />
-              <input
-                type="text"
-                placeholder="Student ID"
-                className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 focus:ring-2 focus:ring-green-500"
-                value={formData?.studentId || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, studentId: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-xl">
-            <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
-              Appearance
-            </h4>
-            <div className="flex items-center justify-between p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-              <span className="text-gray-700 dark:text-gray-300">
-                Dark Mode
-              </span>
-              <button
-                onClick={onDarkModeToggle}
-                className={`px-4 py-2 rounded-lg transition-colors ${darkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-800"}`}
-              >
-                {darkMode ? "🌙 Dark" : "☀️ Light"}
-              </button>
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-4 rounded-xl">
-            <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
-              Notifications
-            </h4>
-            <div className="space-y-3">
-              {Object.entries(notifications).map(([key, value]) => (
-                <div
-                  key={key}
-                  className="flex items-center justify-between p-2 hover:bg-white/50 rounded-lg"
-                >
-                  <span className="text-gray-700 dark:text-gray-300 capitalize">
-                    {key.replace(/([A-Z])/g, " $1").trim()}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setNotifications({ ...notifications, [key]: !value })
-                    }
-                    className={`w-12 h-6 rounded-full transition-colors ${value ? "bg-green-500" : "bg-gray-300"}`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white transform transition-transform ${value ? "translate-x-6" : "translate-x-1"}`}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-4 rounded-xl">
-            <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
-              Privacy
-            </h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-2 hover:bg-white/50 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">
-                  Profile Visibility
-                </span>
-                <select
-                  className="px-3 py-1 border rounded-lg dark:bg-gray-700"
-                  value={privacy.profileVisibility}
-                  onChange={(e) =>
-                    setPrivacy({
-                      ...privacy,
-                      profileVisibility: e.target.value,
-                    })
-                  }
-                >
-                  <option value="public">Public</option>
-                  <option value="campus">Campus Only</option>
-                  <option value="private">Private</option>
-                </select>
-              </div>
-              <div className="flex items-center justify-between p-2 hover:bg-white/50 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">
-                  Show Email
-                </span>
-                <button
-                  onClick={() =>
-                    setPrivacy({ ...privacy, showEmail: !privacy.showEmail })
-                  }
-                  className={`w-12 h-6 rounded-full transition-colors ${privacy.showEmail ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transform transition-transform ${privacy.showEmail ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-              <div className="flex items-center justify-between p-2 hover:bg-white/50 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">
-                  Show Phone
-                </span>
-                <button
-                  onClick={() =>
-                    setPrivacy({ ...privacy, showPhone: !privacy.showPhone })
-                  }
-                  className={`w-12 h-6 rounded-full transition-colors ${privacy.showPhone ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transform transition-transform ${privacy.showPhone ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-              <div className="flex items-center justify-between p-2 hover:bg-white/50 rounded-lg">
-                <span className="text-gray-700 dark:text-gray-300">
-                  Show Wishlist
-                </span>
-                <button
-                  onClick={() =>
-                    setPrivacy({
-                      ...privacy,
-                      showWishlist: !privacy.showWishlist,
-                    })
-                  }
-                  className={`w-12 h-6 rounded-full transition-colors ${privacy.showWishlist ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transform transition-transform ${privacy.showWishlist ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-xl">
-            <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
-              Language
-            </h4>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700"
-            >
-              <option value="english">English</option>
-              <option value="spanish">Spanish</option>
-              <option value="french">French</option>
-              <option value="chinese">Chinese</option>
-            </select>
-          </div>
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 p-4 rounded-xl">
-            <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">
-              Data Management
-            </h4>
-            <button
-              onClick={onOpenDataManagement}
-              className="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
-            >
-              <Database className="h-4 w-4" /> Manage Data
-            </button>
-          </div>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-            ) : (
-              "Save Changes"
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const NotificationsModal = ({
   isOpen,
   onClose,
@@ -1461,151 +954,6 @@ const NotificationsModal = ({
         type="danger"
       />
     </>
-  );
-};
-
-const SearchModal = ({ isOpen, onClose, items, onSelect }) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [category, setCategory] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [sortBy, setSortBy] = useState("relevance");
-  const debouncedSearch = useDebounce(searchTerm, 300);
-  const filteredItems = (items || []).filter((item) => {
-    const itemName = item.name || item.cells?.[0] || "";
-    const itemCategory = item.category || item.cells?.[1] || "";
-    const itemStatus = item.status || item.cells?.[2] || "";
-    const matchesSearch =
-      itemName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      itemCategory.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesCategory = category === "all" || itemCategory === category;
-    const matchesStatus = status === "all" || itemStatus === status;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === "name")
-      return (a.name || a.cells?.[0] || "").localeCompare(
-        b.name || b.cells?.[0] || "",
-      );
-    if (sortBy === "date")
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-    return 0;
-  });
-  const categories = [
-    "all",
-    ...new Set(
-      (items || []).map((item) => item.category || item.cells?.[1] || ""),
-    ),
-  ];
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Search Items
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="p-4 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by item name or category..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">Category</label>
-              <select
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat === "all" ? "All Categories" : cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Status</label>
-              <select
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="Available">Available</option>
-                <option value="Borrowed">Borrowed</option>
-                <option value="Pending">Pending</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Sort By</label>
-            <select
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="relevance">Relevance</option>
-              <option value="name">Name</option>
-              <option value="date">Date Added</option>
-            </select>
-          </div>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {sortedItems.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No items found
-              </div>
-            ) : (
-              sortedItems.map((item, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => onSelect(item)}
-                  className="w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="h-12 w-12 object-cover rounded-lg"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-medium">
-                        {item.name || item.cells?.[0]}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {item.category || item.cells?.[1]} •{" "}
-                        {item.status || item.cells?.[2]}
-                      </p>
-                    </div>
-                    {item.status === "Available" && (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                        Available
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 };
 
@@ -1962,97 +1310,8 @@ const AnalyticsModal = ({ isOpen, onClose, data }) => {
                 +{Math.round(completedExchanges * 0.15)}%
               </p>
             </div>
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 text-white shadow-lg">
-              <Coins className="h-6 w-6 mb-2" />
-              <p className="text-2xl font-bold">{totalPoints}</p>
-              <p className="text-xs opacity-90">Points Earned</p>
-              <p className="text-xs opacity-75 mt-1">{getPointsGrowth()}</p>
-            </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-gray-700">
-            <h4 className="font-semibold mb-4 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-green-600" />
-              Category Distribution
-            </h4>
-            {categoryData.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No items to analyze</p>
-                <p className="text-sm text-gray-400">
-                  Share some items to see distribution
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {categoryData.map((cat) => (
-                  <div key={cat.name}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{cat.name}</span>
-                      <span className="text-gray-500">
-                        {cat.value}% ({cat.count} items)
-                      </span>
-                    </div>
-                    <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${cat.value}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-xl p-4">
-              <Leaf className="h-8 w-8 text-green-600 mb-2" />
-              <p className="text-2xl font-bold text-green-600">
-                {totalItems * 5}kg
-              </p>
-              <p className="text-xs text-gray-600">CO₂ Saved</p>
-              <p className="text-xs text-green-600 mt-1">
-                🌱 Equivalent to planting {totalItems} trees
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-4">
-              <DollarSign className="h-8 w-8 text-blue-600 mb-2" />
-              <p className="text-2xl font-bold text-blue-600">
-                ${totalItems * 25}
-              </p>
-              <p className="text-xs text-gray-600">Money Saved</p>
-              <p className="text-xs text-blue-600 mt-1">
-                💰 ~${totalItems * 15} saved on purchases
-              </p>
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-6">
-            <h4 className="font-semibold mb-3 flex items-center gap-2">
-              <Users className="h-4 w-4 text-purple-600" />
-              Community Impact
-            </h4>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-purple-600">
-                  {Math.ceil(totalItems * 3.5)}
-                </p>
-                <p className="text-xs text-gray-600">
-                  Items Saved from Landfill
-                </p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-purple-600">
-                  {Math.ceil(activeExchanges * 2)}
-                </p>
-                <p className="text-xs text-gray-600">Active Borrowers</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-purple-600">
-                  {Math.ceil(totalPoints / 100)}
-                </p>
-                <p className="text-xs text-gray-600">Community Points</p>
-              </div>
-            </div>
-          </div>
+
           <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={handleExportReport}
@@ -2239,77 +1498,6 @@ const EditItemModal = ({ isOpen, onClose, item, onSave }) => {
   );
 };
 
-const MessageDetailModal = ({ isOpen, onClose, message, onReply }) => {
-  const [reply, setReply] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const handleSubmit = async () => {
-    if (!reply.trim()) return;
-    setIsSending(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    onReply(message, reply);
-    setReply("");
-    setIsSending(false);
-  };
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Message from {message?.from}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-              {message?.avatar || message?.from?.charAt(0) || "?"}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold">{message?.from}</p>
-                <p className="text-xs text-gray-400">
-                  {getRelativeTime(message?.time)}
-                </p>
-              </div>
-              <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <p className="text-sm">{message?.message}</p>
-              </div>
-            </div>
-          </div>
-          <div className="border-t pt-4">
-            <label className="block text-sm font-medium mb-2">Reply</label>
-            <textarea
-              rows="4"
-              placeholder="Type your reply..."
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-            />
-          </div>
-          <button
-            onClick={handleSubmit}
-            disabled={isSending || !reply.trim()}
-            className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            {isSending ? "Sending..." : "Send Reply"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ManageExchangesModal = ({
   isOpen,
   onClose,
@@ -2410,367 +1598,6 @@ const ManageExchangesModal = ({
                 </div>
               </div>
             ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const RewardsModal = ({ isOpen, onClose, points, onRedeem }) => {
-  const [redeeming, setRedeeming] = useState(null);
-  const [filter, setFilter] = useState("all");
-  const rewards = [
-    {
-      id: 1,
-      name: "Campus Cafe Voucher",
-      points: 500,
-      icon: "☕",
-      description: "$10 voucher for campus cafe",
-      category: "food",
-      stock: 50,
-    },
-    {
-      id: 2,
-      name: "Bookstore Discount",
-      points: 1000,
-      icon: "📚",
-      description: "20% off at campus bookstore",
-      category: "shopping",
-      stock: 30,
-    },
-    {
-      id: 3,
-      name: "Tech Accessory",
-      points: 1500,
-      icon: "🎧",
-      description: "Wireless earbuds",
-      category: "electronics",
-      stock: 15,
-    },
-    {
-      id: 4,
-      name: "Eco Warrior Badge",
-      points: 2000,
-      icon: "🌱",
-      description: "Special badge and recognition",
-      category: "badge",
-      stock: 100,
-    },
-    {
-      id: 5,
-      name: "Premium Status",
-      points: 3000,
-      icon: "👑",
-      description: "6 months premium membership",
-      category: "membership",
-      stock: 20,
-    },
-    {
-      id: 6,
-      name: "Campus Merchandise",
-      points: 800,
-      icon: "👕",
-      description: "Campus t-shirt",
-      category: "merch",
-      stock: 25,
-    },
-  ];
-  const filteredRewards =
-    filter === "all" ? rewards : rewards.filter((r) => r.category === filter);
-  const categories = ["all", ...new Set(rewards.map((r) => r.category))];
-  const handleRedeem = async (reward) => {
-    if (points < reward.points) {
-      alert(
-        `You need ${reward.points - points} more points to redeem this reward`,
-      );
-      return;
-    }
-    setRedeeming(reward.id);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    onRedeem(reward);
-    setRedeeming(null);
-  };
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Rewards
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div className="text-center p-6 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl text-white shadow-lg">
-            <Coins className="h-12 w-12 mx-auto mb-2" />
-            <p className="text-3xl font-bold mb-2">{points || 0}</p>
-            <p className="text-sm">Total Points Earned</p>
-            <p className="text-xs mt-2">
-              Earn points by sharing items and completing exchanges!
-            </p>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-3 py-1 rounded-full text-sm transition-colors whitespace-nowrap ${filter === cat ? "bg-green-600 text-white" : "bg-gray-100 dark:bg-gray-700"}`}
-              >
-                {cat === "all"
-                  ? "All Rewards"
-                  : cat.charAt(0).toUpperCase() + cat.slice(1)}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filteredRewards.map((reward) => (
-              <div
-                key={reward.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{reward.icon}</span>
-                  <div>
-                    <p className="font-semibold">{reward.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {reward.description}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-xs text-green-600 font-medium">
-                        {reward.points} points
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {reward.stock} left
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleRedeem(reward)}
-                  disabled={points < reward.points || redeeming === reward.id}
-                  className={`px-4 py-2 rounded-lg text-sm transition-colors ${points >= reward.points ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
-                >
-                  {redeeming === reward.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Redeem"
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ShareModal = ({ isOpen, onClose, item, onShare }) => {
-  const [copied, setCopied] = useState(false);
-  const shareOptions = [
-    { name: "Copy Link", icon: Copy, action: "copy", color: "text-gray-600" },
-    {
-      name: "Share to Facebook",
-      icon: Facebook,
-      action: "facebook",
-      color: "text-blue-600",
-    },
-    {
-      name: "Share to Campus Feed",
-      icon: Users,
-      action: "campus",
-      color: "text-green-600",
-    },
-  ];
-  const handleShare = (action) => {
-    if (action === "copy") {
-      const url = `${window.location.origin}/item/${item?.id}`;
-      navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-    onShare(item, action);
-  };
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Share
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <p className="text-sm text-gray-600 mb-4">
-            Share this item with friends
-          </p>
-          {shareOptions.map((option, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleShare(option.action)}
-              className="w-full flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <option.icon className={`h-5 w-5 ${option.color}`} />
-              <span>{option.name}</span>
-              {option.action === "copy" && copied && (
-                <span className="ml-auto text-xs text-green-600">Copied!</span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ScanQRModal = ({ isOpen, onClose, onScan, items = [] }) => {
-  const [scanning, setScanning] = useState(true);
-  const [scannedData, setScannedData] = useState(null);
-
-  const handleScan = (result) => {
-    if (result) {
-      setScanning(false);
-      try {
-        const data = JSON.parse(result?.text);
-        setScannedData({
-          item: data.title || data.item,
-          owner: data.owner,
-          location: data.location,
-          id: data.id,
-          status: data.status || "Available",
-        });
-      } catch (error) {
-        // Try to find item by ID in passed items
-        const item = items.find((i) => i._id === result?.text);
-        if (item) {
-          setScannedData({
-            item: item.title,
-            owner: item.owner?.fullName || "Unknown",
-            location: item.location,
-            id: item._id,
-            status: item.status,
-          });
-        } else {
-          toast.error("Invalid QR code");
-          setScanning(true);
-        }
-      }
-    }
-  };
-
-  const handleError = (error) => {
-    console.error("QR Scanner error:", error);
-    toast.error("Camera access denied or unavailable");
-  };
-
-  const confirmScan = () => {
-    if (scannedData) {
-      onScan(scannedData);
-      onClose();
-    }
-  };
-
-  const resetScan = () => {
-    setScannedData(null);
-    setScanning(true);
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Scan QR Code
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-
-        <div className="text-center space-y-4">
-          {scanning && !scannedData && (
-            <>
-              <div className="w-64 h-64 mx-auto overflow-hidden rounded-xl">
-                <QrReader
-                  onResult={handleScan}
-                  onError={handleError}
-                  constraints={{ facingMode: "environment" }}
-                  containerStyle={{ width: "100%", height: "100%" }}
-                  videoStyle={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              </div>
-              <p className="text-sm text-gray-600">
-                Position the QR code within the frame
-              </p>
-            </>
-          )}
-
-          {!scanning && !scannedData && (
-            <>
-              <div className="w-48 h-48 mx-auto bg-gray-200 dark:bg-gray-700 rounded-xl flex items-center justify-center">
-                <AlertCircle className="h-16 w-16 text-red-400" />
-              </div>
-              <p className="text-sm text-red-600">Failed to scan QR code</p>
-              <button
-                onClick={() => setScanning(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 w-full"
-              >
-                Try Again
-              </button>
-            </>
-          )}
-
-          {scannedData && (
-            <>
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-2" />
-                <p className="font-semibold text-lg">{scannedData.item}</p>
-                <p className="text-sm text-gray-600">
-                  Owner: {scannedData.owner}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Location: {scannedData.location}
-                </p>
-                <p className="text-xs text-green-600 mt-2">
-                  Status: {scannedData.status}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={confirmScan}
-                  className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  Confirm Item
-                </button>
-                <button
-                  onClick={resetScan}
-                  className="flex-1 py-2 border rounded-lg hover:bg-gray-50"
-                >
-                  Scan Again
-                </button>
-              </div>
-            </>
           )}
         </div>
       </div>
@@ -2912,12 +1739,7 @@ const ViewItemModal = ({
                 Request Item
               </button>
             )}
-            <button
-              onClick={() => onShare(item)}
-              className="flex-1 py-2 border rounded-lg hover:bg-gray-50 transition-all"
-            >
-              Share
-            </button>
+
             {onAddToWishlist && (
               <button
                 onClick={() => onAddToWishlist(item)}
@@ -3359,116 +2181,6 @@ const ProfileCardModal = ({ isOpen, onClose, user, onUpdateUser }) => {
   );
 };
 
-const QuickActionsMenu = ({ isOpen, onClose, onAction }) => {
-  const actions = [
-    {
-      id: "share",
-      name: "Share Item",
-      icon: Plus,
-      color: "text-green-600",
-      shortcut: "⌘N",
-    },
-    {
-      id: "scan",
-      name: "Scan QR",
-      icon: QrCode,
-      color: "text-blue-600",
-      shortcut: "⌘Q",
-    },
-    {
-      id: "rewards",
-      name: "Rewards",
-      icon: Gift,
-      color: "text-orange-600",
-      shortcut: null,
-    },
-    {
-      id: "calendar",
-      name: "Calendar",
-      icon: CalendarDays,
-      color: "text-purple-600",
-      shortcut: null,
-    },
-    {
-      id: "analytics",
-      name: "Analytics",
-      icon: TrendingUp,
-      color: "text-emerald-600",
-      shortcut: null,
-    },
-    {
-      id: "messages",
-      name: "Messages",
-      icon: MessageSquare,
-      color: "text-indigo-600",
-      shortcut: "⌘M",
-    },
-    {
-      id: "wishlist",
-      name: "Wishlist",
-      icon: Heart,
-      color: "text-red-600",
-      shortcut: "⌘W",
-    },
-    {
-      id: "data",
-      name: "Data Management",
-      icon: Database,
-      color: "text-gray-600",
-      shortcut: null,
-    },
-    {
-      id: "help",
-      name: "Help Center",
-      icon: HelpCircle,
-      color: "text-gray-600",
-      shortcut: "?",
-    },
-    {
-      id: "feedback",
-      name: "Feedback",
-      icon: ThumbsUp,
-      color: "text-pink-600",
-      shortcut: null,
-    },
-  ];
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end pr-20 pt-20 pointer-events-none">
-      <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-3 w-72 pointer-events-auto animate-in slide-in-from-top-5 duration-200 border border-gray-100 dark:border-gray-700"
-        onMouseLeave={onClose}
-      >
-        <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase">
-            Quick Actions
-          </p>
-        </div>
-        {actions.map((action) => (
-          <button
-            key={action.id}
-            onClick={() => {
-              onAction(action.id);
-              onClose();
-            }}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <action.icon className={`h-4 w-4 ${action.color}`} />
-              <span className="text-sm">{action.name}</span>
-            </div>
-            {action.shortcut && (
-              <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                {action.shortcut}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const TrendingItems = ({ items, onItemClick }) => {
   const trendingItems = (items || [])
     .sort((a, b) => (b.requests || 0) - (a.requests || 0))
@@ -3532,100 +2244,6 @@ const TrendingItems = ({ items, onItemClick }) => {
   );
 };
 
-const AchievementProgress = ({ user, items, exchanges }) => {
-  const achievements = [
-    {
-      name: "Sharer",
-      icon: Package,
-      current: items?.length || 0,
-      target: 10,
-      color: "green",
-    },
-    {
-      name: "Helper",
-      icon: Handshake,
-      current: exchanges?.length || 0,
-      target: 20,
-      color: "blue",
-    },
-    {
-      name: "Eco Warrior",
-      icon: Leaf,
-      current: (items?.length || 0) * 5,
-      target: 100,
-      color: "emerald",
-    },
-    {
-      name: "Trusted",
-      icon: Shield,
-      current: Math.floor((user?.points || 0) / 100),
-      target: 50,
-      color: "purple",
-    },
-  ];
-  const overallProgress = Math.round(
-    achievements.reduce(
-      (acc, ach) => acc + Math.min(100, (ach.current / ach.target) * 25),
-      0,
-    ),
-  );
-  const colorMap = {
-    green: "from-green-500 to-green-600",
-    blue: "from-blue-500 to-blue-600",
-    emerald: "from-emerald-500 to-emerald-600",
-    purple: "from-purple-500 to-purple-600",
-  };
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Achievement Progress</h3>
-        <Trophy className="h-5 w-5 text-yellow-500" />
-      </div>
-      <div className="space-y-4">
-        {achievements.map((ach) => {
-          const percentage = Math.min(100, (ach.current / ach.target) * 100);
-          const Icon = ach.icon;
-          return (
-            <div key={ach.name}>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <div className="flex items-center gap-2">
-                  <Icon className={`h-4 w-4 text-${ach.color}-500`} />
-                  <span>{ach.name}</span>
-                </div>
-                <span className="text-gray-500">
-                  {ach.current}/{ach.target}
-                </span>
-              </div>
-              <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div
-                  className={`bg-gradient-to-r ${colorMap[ach.color]} h-2 rounded-full transition-all duration-500`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Overall Progress</span>
-          <div className="flex items-center gap-2">
-            <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-              <div
-                className="bg-gradient-to-r from-green-500 to-blue-500 h-1.5 rounded-full transition-all duration-500"
-                style={{ width: `${overallProgress}%` }}
-              />
-            </div>
-            <span className="font-semibold text-green-600">
-              {overallProgress}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -3667,7 +2285,8 @@ class ErrorBoundary extends React.Component {
 function DashboardPage() {
   const router = useRouter();
   const { user, apiCall, logout } = useAuth();
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected, on, off, connectionError } = useSocket();
+  // const { isConnected, on, off } = useSocket();
   const {
     notifications,
     unreadCount,
@@ -3676,17 +2295,19 @@ function DashboardPage() {
     deleteNotification,
     clearAllNotifications,
   } = useNotifications();
-
+  const [showRatingModal, setShowRatingModal] = useState(false);
   // ============ UI STATES (Keep ALL your UI features) ============
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeNav, setActiveNav] = useState("overview");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [viewMode, setViewMode] = useState("grid");
-  const [toast, setToast] = useState(null);
+  const [notificationToast, setNotificationToast] = useState(null);
   const [headerColor, setHeaderColor] = useLocalStorage(
     "headerColor",
     "default",
   );
+  const [sortBy, setSortBy] = useState("date-desc");
+  // const [exchangeFilter, setExchangeFilter] = useState("all");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -3706,7 +2327,7 @@ function DashboardPage() {
   const [myItems, setMyItems] = useState([]);
   const [exchanges, setExchanges] = useState([]);
   const [notificationsData, setNotificationsData] = useState([]);
-  const [messages, setMessages] = useState([]);
+
   const [stats, setStats] = useState({
     itemsShared: 0,
     itemsBorrowed: 0,
@@ -3717,12 +2338,305 @@ function DashboardPage() {
     totalSavings: 0,
     carbonSaved: 0,
   });
+  // ============ FETCH WISHLIST DATA ============
+  const fetchWishlist = useCallback(async () => {
+    try {
+      const response = await apiCall("/wishlist");
+      if (response.success && response.wishlist) {
+        const formattedWishlist = response.wishlist.map((item) => ({
+          id: item._id,
+          name: item.title,
+          category: item.category,
+          price: item.price,
+          priceUnit: item.priceUnit,
+          location: item.location,
+          image: item.images?.[0]?.url,
+          rating: item.rating,
+          addedAt: item.createdAt,
+          isAvailable: item.status === "available",
+        }));
+        setWishlist(formattedWishlist);
+      }
+    } catch (error) {
+      console.error("Fetch wishlist error:", error);
+    }
+  }, [apiCall]);
+
+  // ============ FETCH REVIEWS DATA ============
+  const fetchReviews = useCallback(async () => {
+    try {
+      const response = await apiCall("/users/me/reviews");
+      if (response.success && response.reviews) {
+        setReviews(response.reviews);
+      }
+    } catch (error) {
+      console.error("Fetch reviews error:", error);
+    }
+  }, [apiCall]);
+
+  // ============ FETCH NOTIFICATIONS DATA ============
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await apiCall("/notifications?limit=50");
+      if (response.success && response.notifications) {
+        setNotificationsData(response.notifications);
+      }
+    } catch (error) {
+      console.error("Fetch notifications error:", error);
+    }
+  }, [apiCall]);
+  const handleDeleteExchange = async (exchange) => {
+    // Get ID from multiple possible sources
+    const exchangeId = exchange?._id || exchange?.id;
+
+    if (!exchangeId) {
+      toast.error("Cannot delete: Missing exchange ID");
+      console.error("Exchange object:", exchange);
+      return;
+    }
+
+    console.log("Deleting exchange:", exchangeId);
+
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}`, {
+        method: "DELETE",
+      });
+
+      if (response.success) {
+        toast.success("Exchange deleted successfully");
+        // Update local state immediately
+        setExchanges((prev) =>
+          prev.filter((ex) => (ex._id || ex.id) !== exchangeId),
+        );
+      } else {
+        toast.error(response.message || "Failed to delete exchange");
+      }
+    } catch (error) {
+      console.error("Delete exchange error:", error);
+      toast.error(error.message || "Failed to delete exchange");
+    }
+  };
+  const handleReviewHelpful = async (reviewId) => {
+    try {
+      await apiCall(`/reviews/${reviewId}/helpful`, { method: "POST" });
+      toast.success("Thanks for your feedback!");
+      loadDashboardData();
+    } catch (error) {
+      console.error("Error marking review helpful:", error);
+      toast.error("Failed to mark as helpful");
+    }
+  };
+  // Add these with your other handlers
+  // Handle exchange approval
+  const handleApproveExchange = async (exchange) => {
+    const exchangeId = exchange?.id || exchange?._id;
+    if (!exchangeId) {
+      toast.error("Cannot approve: Missing exchange ID");
+      return;
+    }
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (response.success) {
+        toast.success("Exchange approved");
+        loadDashboardData();
+      } else {
+        toast.error(response.message || "Failed to approve");
+      }
+    } catch (error) {
+      toast.error("Failed to approve exchange");
+    }
+  };
+
+  // Handle exchange decline
+  const handleDeclineExchange = async (exchange) => {
+    const exchangeId = exchange?.id || exchange?._id;
+    if (!exchangeId) {
+      toast.error("Cannot decline: Missing exchange ID");
+      return;
+    }
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "canceled" }),
+      });
+      if (response.success) {
+        toast.success("Exchange declined");
+        loadDashboardData();
+      } else {
+        toast.error(response.message || "Failed to decline");
+      }
+    } catch (error) {
+      toast.error("Failed to decline exchange");
+    }
+  };
+
+  // Handle return item
+  const handleReturnExchange = async (exchange) => {
+    const exchangeId = exchange?.id || exchange?._id;
+    if (!exchangeId) {
+      toast.error("Cannot return: Missing exchange ID");
+      return;
+    }
+
+    // Show return modal with condition options
+    const condition = prompt(
+      "Enter return condition (excellent/good/fair/damaged):",
+      "good",
+    );
+    if (!condition) return;
+
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/return`, {
+        method: "POST",
+        body: JSON.stringify({
+          condition: condition,
+          returnNotes: "Item returned via dashboard",
+          returnPhotos: [],
+        }),
+      });
+      if (response.success) {
+        toast.success("Item returned successfully! +100 points");
+        loadDashboardData();
+      } else {
+        toast.error(response.message || "Failed to return item");
+      }
+    } catch (error) {
+      toast.error("Failed to return item");
+    }
+  };
+
+  const handleRateExchange = async (exchange, ratingData) => {
+    // Add null check
+    if (!exchange) {
+      toast.error("Cannot rate: Exchange data is missing");
+      setShowRatingModal(false);
+      return;
+    }
+
+    const exchangeId = exchange?._id || exchange?.id;
+    if (!exchangeId) {
+      toast.error("Cannot rate: Missing exchange ID");
+      setShowRatingModal(false);
+      return;
+    }
+
+    if (!ratingData.rating || ratingData.rating < 1 || ratingData.rating > 5) {
+      toast.error("Please select a rating");
+      return;
+    }
+
+    // Check if already rated
+    const isOwner = user?._id === exchange.owner?._id;
+    const alreadyRated = isOwner
+      ? exchange.ownerRating
+      : exchange.borrowerRating;
+
+    if (alreadyRated) {
+      toast.error("You have already rated this exchange");
+      setShowRatingModal(false);
+      return;
+    }
+
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/rate`, {
+        method: "POST",
+        body: JSON.stringify({
+          rating: ratingData.rating,
+          review: ratingData.review || "",
+          tags: ratingData.tags || [],
+          isPublic: true,
+        }),
+      });
+
+      if (response.success) {
+        toast.success(
+          `Rating submitted! +${response.pointsEarned || 50} points`,
+        );
+
+        // ✅ Force refresh dashboard data
+        await loadDashboardData();
+
+        setShowRatingModal(false);
+        setSelectedExchange(null);
+      } else {
+        toast.error(response.message || "Failed to submit rating");
+      }
+    } catch (error) {
+      console.error("Rate error:", error);
+      toast.error(error.message || "Failed to submit rating");
+    }
+  };
+  // Cancel exchange request (for borrower)
+  const handleCancelExchange = async (exchange) => {
+    const exchangeId = exchange?._id || exchange?.id;
+    if (!exchangeId) {
+      toast.error("Cannot cancel: Missing exchange ID");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to cancel this request?")) return;
+
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "canceled" }),
+      });
+      if (response.success) {
+        toast.success("Request cancelled successfully");
+        loadDashboardData();
+      } else {
+        toast.error(response.message || "Failed to cancel");
+      }
+    } catch (error) {
+      console.error("Cancel error:", error);
+      toast.error("Failed to cancel request");
+    }
+  };
+
+  // Activate exchange (mark as picked up) - for owner
+  const handleActivateExchange = async (exchange) => {
+    const exchangeId = exchange?._id || exchange?.id;
+    if (!exchangeId) {
+      toast.error("Cannot activate: Missing exchange ID");
+      return;
+    }
+
+    if (
+      !confirm(
+        "Has the borrower picked up the item? This will start the rental period.",
+      )
+    )
+      return;
+
+    try {
+      const response = await apiCall(`/exchanges/${exchangeId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "active" }),
+      });
+      if (response.success) {
+        toast.success("Item marked as picked up! Rental period started.");
+        loadDashboardData();
+      } else {
+        toast.error(response.message || "Failed to activate");
+      }
+    } catch (error) {
+      console.error("Activate error:", error);
+      toast.error("Failed to activate exchange");
+    }
+  };
 
   // ============ LOCAL STORAGE DATA (For features that don't have backend yet) ============
   const [wishlist, setWishlist] = useLocalStorage("wishlist", []);
   const [events, setEvents] = useLocalStorage("events", []);
   const [activities, setActivities] = useLocalStorage("activities", []);
-
+  // Add these state variables
+  const [exchangeFilter, setExchangeFilter] = useState("all");
+  const [itemsFilter, setItemsFilter] = useState("all");
+  const [reviews, setReviews] = useState([]);
+  const [filteredItems, setFilteredItems] = useState([]);
   // ============ MODAL STATES ============
   const [modals, setModals] = useState({
     settings: false,
@@ -3749,8 +2663,8 @@ function DashboardPage() {
   const [selectedExchange, setSelectedExchange] = useState(null);
 
   const showToast = useCallback((message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setNotificationToast({ message, type });
+    setTimeout(() => setNotificationToast(null), 3000);
   }, []);
 
   const openModal = useCallback(
@@ -3762,50 +2676,70 @@ function DashboardPage() {
     [],
   );
 
-  // ============ LOAD REAL DATA FROM BACKEND ============
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [itemsRes, exchangesRes, statsRes, notificationsRes, messagesRes] =
-        await Promise.all([
-          apiCall("/users/me/items").catch(() => ({
-            success: false,
-            items: [],
-          })),
-          apiCall("/users/me/exchanges").catch(() => ({
-            success: false,
-            exchanges: [],
-          })),
-          apiCall("/users/me/stats").catch(() => ({
-            success: false,
-            stats: {},
-          })),
-          apiCall("/notifications?limit=50").catch(() => ({
-            success: false,
-            notifications: [],
-          })),
-          apiCall("/messages/conversations").catch(() => ({
-            success: false,
-            conversations: [],
-          })),
-        ]);
+      const [
+        itemsRes,
+        exchangesRes,
+        statsRes,
+        notificationsRes,
+        reviewsRes,
+        wishlistRes,
+      ] = await Promise.all([
+        apiCall("/users/me/items").catch(() => ({ success: false, items: [] })),
+        apiCall("/exchanges").catch(() => ({ success: false, exchanges: [] })),
+        apiCall("/users/me/stats").catch(() => ({ success: false, stats: {} })),
+        apiCall("/notifications?limit=50").catch(() => ({
+          success: false,
+          notifications: [],
+        })),
+        apiCall("/users/me/reviews").catch(() => ({
+          success: false,
+          reviews: [],
+        })),
+        apiCall("/wishlist").catch(() => ({ success: false, wishlist: [] })),
+      ]);
 
       if (itemsRes.success) setMyItems(itemsRes.items || []);
-      if (exchangesRes.success) setExchanges(exchangesRes.exchanges || []);
+
+      // ✅ FILTER OUT ORPHANED EXCHANGES
+      if (exchangesRes.success) {
+        // Only keep exchanges that have valid resource data
+        const validExchanges = exchangesRes.exchanges.filter((ex) => {
+          return ex.resource && ex.resource._id && ex.resource.title;
+        });
+        setExchanges(validExchanges);
+
+        // Optional: Log warning about filtered exchanges
+        const filteredCount =
+          exchangesRes.exchanges.length - validExchanges.length;
+        if (filteredCount > 0) {
+          console.warn(
+            `🔍 Removed ${filteredCount} orphaned exchange(s) (deleted items)`,
+          );
+        }
+      }
+
       if (statsRes.success) setStats(statsRes.stats);
       if (notificationsRes.success)
         setNotificationsData(notificationsRes.notifications || []);
-      if (messagesRes.success) {
-        const formattedMessages =
-          messagesRes.conversations?.map((conv) => ({
-            id: conv._id,
-            from: conv.otherParticipant?.fullName || "User",
-            message: conv.lastMessageText || "No messages",
-            time: conv.lastMessageAt || new Date().toISOString(),
-            avatar: conv.otherParticipant?.fullName?.charAt(0) || "U",
-            unread: conv.unreadCount > 0,
-          })) || [];
-        setMessages(formattedMessages);
+      if (reviewsRes.success) setReviews(reviewsRes.reviews || []);
+
+      if (wishlistRes.success && wishlistRes.wishlist) {
+        const formattedWishlist = wishlistRes.wishlist.map((item) => ({
+          id: item._id,
+          name: item.title,
+          category: item.category,
+          price: item.price,
+          priceUnit: item.priceUnit,
+          location: item.location,
+          image: item.images?.[0]?.url,
+          rating: item.rating,
+          addedAt: item.createdAt,
+          isAvailable: item.status === "available",
+        }));
+        setWishlist(formattedWishlist);
       }
     } catch (error) {
       console.error("Load dashboard error:", error);
@@ -3814,6 +2748,175 @@ function DashboardPage() {
       setIsLoading(false);
     }
   }, [apiCall, showToast]);
+  // Add this after your loadDashboardData useEffect
+  useEffect(() => {
+    console.log("=== DEBUG USER DATA ===");
+    console.log("Current User ID:", user?._id);
+    console.log("User object:", user);
+
+    if (exchanges.length > 0) {
+      console.log("=== DEBUG EXCHANGE DATA ===");
+      exchanges.forEach((ex) => {
+        console.log(`Exchange ${ex._id}:`, {
+          ownerId: ex.owner?._id,
+          ownerName: ex.owner?.fullName,
+          borrowerId: ex.borrower?._id,
+          borrowerName: ex.borrower?.fullName,
+          status: ex.status,
+        });
+      });
+    }
+  }, [user, exchanges]);
+
+  // ============ REAL-TIME SOCKET EVENT LISTENERS ============
+  useEffect(() => {
+    if (!isConnected || !socket) {
+      console.log("Socket not connected yet");
+      return;
+    }
+
+    console.log("Setting up real-time listeners for dashboard");
+
+    // Listen for item status changes
+    const handleItemStatusChange = (data) => {
+      console.log("📦 Item status changed:", data);
+      setMyItems((prevItems) =>
+        prevItems.map((item) =>
+          item._id === data.itemId
+            ? {
+                ...item,
+                status: data.newStatus,
+                ...(data.borrowerName && { borrowedBy: data.borrowerName }),
+                ...(data.returnDate && { expectedReturn: data.returnDate }),
+              }
+            : item,
+        ),
+      );
+      toast.success(`${data.itemTitle} is now ${data.newStatus}`);
+      if (data.exchangeId) loadDashboardData();
+    };
+
+    // Listen for new requests
+    const handleNewRequest = (data) => {
+      console.log("📨 New request received:", data);
+      setMyItems((prevItems) =>
+        prevItems.map((item) =>
+          item._id === data.itemId
+            ? { ...item, requests: (item.requests || 0) + 1 }
+            : item,
+        ),
+      );
+      toast.success(
+        `${data.requesterName} wants to borrow "${data.itemTitle}"`,
+        { duration: 5000 },
+      );
+    };
+
+    // Listen for exchange updates
+    const handleExchangeUpdate = (data) => {
+      console.log("🔄 Exchange updated:", data);
+      setExchanges((prevExchanges) =>
+        prevExchanges.map((exchange) =>
+          exchange._id === data.exchangeId
+            ? { ...exchange, status: data.newStatus }
+            : exchange,
+        ),
+      );
+      if (data.itemId && data.itemStatus) {
+        setMyItems((prevItems) =>
+          prevItems.map((item) =>
+            item._id === data.itemId
+              ? { ...item, status: data.itemStatus }
+              : item,
+          ),
+        );
+      }
+      toast.info(data.message || `Exchange ${data.newStatus}`);
+    };
+
+    // Listen for item views
+    const handleItemViewed = (data) => {
+      console.log("👁️ Item viewed:", data);
+      setMyItems((prevItems) =>
+        prevItems.map((item) =>
+          item._id === data.itemId
+            ? { ...item, views: (item.views || 0) + 1 }
+            : item,
+        ),
+      );
+    };
+
+    // ✅ NEW: Listen for exchange rated events
+    const handleExchangeRated = (data) => {
+      console.log("⭐ Exchange rated event received:", data);
+
+      // Refresh dashboard to show updated rating status
+      loadDashboardData();
+
+      // Show notification to the other user
+      if (data.ratedBy !== user?._id) {
+        toast.success("The other user has rated your exchange!", {
+          duration: 5000,
+          icon: "⭐",
+        });
+      }
+    };
+
+    // Register listeners - on() returns unsubscribe function
+    const unsubStatus = on("item-status-changed", handleItemStatusChange);
+    const unsubRequest = on("new-request", handleNewRequest);
+    const unsubExchange = on("exchange-updated", handleExchangeUpdate);
+    const unsubViewed = on("item-viewed", handleItemViewed);
+    const unsubRated = on("exchange-rated", handleExchangeRated); // ✅ ADD THIS
+
+    // Cleanup - call the unsubscribe functions
+    return () => {
+      if (unsubStatus) unsubStatus();
+      if (unsubRequest) unsubRequest();
+      if (unsubExchange) unsubExchange();
+      if (unsubViewed) unsubViewed();
+      if (unsubRated) unsubRated(); // ✅ ADD THIS
+    };
+  }, [isConnected, socket, on, loadDashboardData, user?._id]); // ✅ Add user?._id to dependencies // ← Added loadDashboardData dependency
+  const filteredAndSortedItems = useMemo(() => {
+    let filtered = [...myItems];
+
+    if (itemsFilter !== "all") {
+      filtered = filtered.filter((item) => item.status === itemsFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (item) =>
+          item.title?.toLowerCase().includes(query) ||
+          item.category?.toLowerCase().includes(query) ||
+          item.description?.toLowerCase().includes(query),
+      );
+    }
+
+    switch (sortBy) {
+      case "date-desc":
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      case "date-asc":
+        filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        break;
+      case "name-asc":
+        filtered.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+        break;
+      case "name-desc":
+        filtered.sort((a, b) => (b.title || "").localeCompare(a.title || ""));
+        break;
+      case "requests":
+        filtered.sort((a, b) => (b.requests || 0) - (a.requests || 0));
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  }, [myItems, searchQuery, itemsFilter, sortBy]);
 
   useEffect(() => {
     loadDashboardData();
@@ -3821,6 +2924,7 @@ function DashboardPage() {
 
   // ============ FORMAT DATA FOR DISPLAY ============
   const formattedExchanges = exchanges.map((ex) => ({
+    _id: ex._id,
     id: ex._id,
     cells: [
       ex.resource?.title || "Unknown Item",
@@ -3832,17 +2936,29 @@ function DashboardPage() {
         ? "🟢 Active"
         : ex.status === "pending"
           ? "⏳ Pending"
-          : ex.status === "completed"
-            ? "✅ Completed"
-            : ex.status,
+          : ex.status === "approved"
+            ? "✅ Approved"
+            : ex.status === "completed"
+              ? "✅ Completed"
+              : ex.status === "canceled"
+                ? "❌ Canceled"
+                : ex.status,
       ex.status === "active"
-        ? "→ Return"
+        ? "Return"
         : ex.status === "pending"
-          ? "→ View"
-          : "→ Details",
+          ? "View"
+          : "Details",
     ],
     itemId: ex.resource?._id,
     status: ex.status,
+    startDate: ex.startDate,
+    endDate: ex.endDate,
+    resource: ex.resource,
+    owner: ex.owner,
+    borrower: ex.borrower,
+    message: ex.message,
+    totalAmount: ex.totalAmount,
+    duration: ex.duration,
   }));
 
   const displayNotifications = notificationsData.map((n) => ({
@@ -3853,141 +2969,7 @@ function DashboardPage() {
     read: n.read,
   }));
 
-  // ============ METRICS FROM REAL DATA ============
-  const metrics = [
-    {
-      title: "Total Items",
-      value: stats.itemsShared?.toString() || "0",
-      change: "+12%",
-      icon: Package,
-      trend: "up",
-      color: "from-green-500 to-green-600",
-      subtitle: `${myItems.filter((i) => i.status === "available").length || 0} active listings`,
-    },
-    {
-      title: "Active Exchanges",
-      value: exchanges.filter((e) => e.status === "active").length.toString(),
-      change: "+8%",
-      icon: Handshake,
-      trend: "up",
-      color: "from-blue-500 to-blue-600",
-      subtitle: "ongoing transactions",
-    },
-    {
-      title: "Trust Score",
-      value: `${stats.trustScore || 0}%`,
-      change: "+0.3",
-      icon: Award,
-      trend: "up",
-      color: "from-purple-500 to-purple-600",
-      subtitle: "Top 5%",
-    },
-    {
-      title: "Points Earned",
-      value: stats.points?.toString() || "0",
-      change: "+245",
-      icon: Gift,
-      trend: "up",
-      color: "from-orange-500 to-orange-600",
-      subtitle: "this month",
-    },
-  ];
-
-  // ============ QUICK STATS ============
-  const quickStats = [
-    {
-      label: "Total Value Saved",
-      value: `$${stats.totalSavings || 0}`,
-      icon: DollarSign,
-      color: "text-green-600",
-    },
-    {
-      label: "CO₂ Saved",
-      value: `${stats.carbonSaved || 0}kg`,
-      icon: Leaf,
-      color: "text-green-600",
-    },
-    {
-      label: "Active Friends",
-      value: exchanges.length.toString(),
-      icon: Users,
-      color: "text-blue-600",
-    },
-    {
-      label: "Items in Wishlist",
-      value: (wishlist?.length || 0).toString(),
-      icon: Heart,
-      color: "text-red-600",
-    },
-  ];
-
-  // ============ POPULAR ITEMS ============
-  const popularItems = myItems.slice(0, 4).map((item) => ({
-    name: item.title,
-    requests: item.requests || 0,
-    trend: "+5",
-    icon:
-      item.category === "Books"
-        ? BookOpen
-        : item.category === "Electronics"
-          ? Laptop
-          : item.category === "Tools"
-            ? Wrench
-            : Package,
-  }));
-  while (popularItems.length < 4) {
-    popularItems.push({
-      name: "Sample Item",
-      requests: 0,
-      trend: "+0",
-      icon: Package,
-    });
-  }
-
-  // ============ BADGES ============
-  const badges = [
-    {
-      name: "Top Sharer",
-      icon: Trophy,
-      color: "from-yellow-500 to-yellow-600",
-      earned: stats.itemsShared >= 10,
-    },
-    {
-      name: "Trusted",
-      icon: Shield,
-      color: "from-blue-500 to-blue-600",
-      earned: stats.trustScore >= 80,
-    },
-    {
-      name: "Eco Hero",
-      icon: Leaf,
-      color: "from-green-500 to-green-600",
-      earned: stats.carbonSaved >= 100,
-    },
-    {
-      name: "Community Leader",
-      icon: Users,
-      color: "from-purple-500 to-purple-600",
-      earned: stats.successfulExchanges >= 20,
-    },
-  ];
-
   // ============ HANDLE ACTIONS (Connect to backend) ============
-  const handleAddItem = async (itemData) => {
-    try {
-      const response = await apiCall("/resources", {
-        method: "POST",
-        body: JSON.stringify(itemData),
-      });
-      if (response.success) {
-        showToast("Item shared successfully!", "success");
-        loadDashboardData();
-        closeModal("addItem");
-      }
-    } catch (error) {
-      showToast(error.message || "Failed to share item", "error");
-    }
-  };
 
   const handleDeleteItem = async (item) => {
     try {
@@ -4017,8 +2999,11 @@ function DashboardPage() {
       });
       if (response.success) {
         showToast("Item updated successfully!", "success");
-        loadDashboardData();
+        await loadDashboardData(); // Refresh data to show updates
         closeModal("editItem");
+        // Don't redirect - stay on dashboard my items page
+        // Make sure activeNav is set to "my-items"
+        setActiveNav("my-items");
       }
     } catch (error) {
       showToast(error.message || "Failed to update item", "error");
@@ -4065,12 +3050,40 @@ function DashboardPage() {
     }
   };
 
-  const handleReturnItem = async (exchange, returnData) => {
-    if (!exchange || !exchange.id) {
-      showToast("Invalid exchange", "error");
+  // Replace your existing handleReturnItem with this:
+  const handleReturnItem = async (exchange, returnData = null) => {
+    // For direct return from ExchangesList (without modal)
+    if (!returnData) {
+      // Show a simple prompt or directly call the API
+      if (!exchange || !exchange.id) {
+        toast.error("Invalid exchange");
+        return;
+      }
+
+      try {
+        const response = await apiCall(`/exchanges/${exchange.id}/return`, {
+          method: "POST",
+          body: JSON.stringify({
+            condition: "Good", // Default condition
+            returnNotes: "Item returned",
+            returnPhotos: [],
+          }),
+        });
+
+        if (response.success) {
+          toast.success("Item returned successfully! +100 points");
+          loadDashboardData();
+        } else {
+          toast.error(response.message || "Failed to return item");
+        }
+      } catch (error) {
+        console.error("Return error:", error);
+        toast.error(error.message || "Failed to return item");
+      }
       return;
     }
 
+    // Handle return with full data (from modal)
     try {
       const response = await apiCall(`/exchanges/${exchange.id}/return`, {
         method: "POST",
@@ -4082,15 +3095,15 @@ function DashboardPage() {
       });
 
       if (response.success) {
-        showToast("Item returned successfully! +100 points", "success");
+        toast.success("Item returned successfully! +100 points");
         loadDashboardData();
         closeModal("returnItem");
       } else {
-        showToast(response.message || "Failed to return item", "error");
+        toast.error(response.message || "Failed to return item");
       }
     } catch (error) {
       console.error("Return error:", error);
-      showToast(error.message || "Failed to return item", "error");
+      toast.error(error.message || "Failed to return item");
     }
   };
 
@@ -4232,27 +3245,6 @@ function DashboardPage() {
     }
   };
 
-  const handleMessageClick = (message) => {
-    setSelectedMessage(message);
-    openModal("messageDetail");
-    setMessages((prev) =>
-      prev.map((m) => (m.id === message.id ? { ...m, unread: false } : m)),
-    );
-  };
-
-  const handleSendReply = async (message, reply) => {
-    try {
-      await apiCall("/messages", {
-        method: "POST",
-        body: JSON.stringify({ conversationId: message.id, text: reply }),
-      });
-      showToast("Reply sent!", "success");
-      closeModal("messageDetail");
-    } catch (error) {
-      showToast(error.message || "Failed to send reply", "error");
-    }
-  };
-
   const handleLike = (activity) => {
     setActivities((prev) =>
       prev.map((a) =>
@@ -4268,37 +3260,11 @@ function DashboardPage() {
     if (!activity.liked) showToast("Liked!", "info");
   };
 
-  const handleShare = (item, platform) => {
-    showToast(`Shared to ${platform}!`, "success");
-    closeModal("share");
-  };
-
   const handleAddEvent = (eventData) => {
     setEvents((prev) => [...prev, eventData]);
     showToast("Event added to calendar", "success");
   };
 
-  const handleRedeemReward = (reward) => {
-    if ((stats.points || 0) >= reward.points) {
-      showToast(`Redeemed ${reward.name}!`, "success");
-    } else {
-      showToast(
-        `Need ${reward.points - (stats.points || 0)} more points`,
-        "warning",
-      );
-    }
-  };
-
-  const handleQRScan = (data) => {
-    showToast(`Scanned "${data.item}" successfully!`, "success");
-    const scannedItem = myItems.find((item) => item.title === data.item);
-    if (scannedItem) {
-      setSelectedItem(scannedItem);
-      openModal("viewItem");
-    }
-  };
-
-  const handleSettings = () => openModal("settings");
   const handleDarkModeToggle = () => {
     setIsDarkMode((prev) => !prev);
     showToast(`${!isDarkMode ? "Dark" : "Light"} mode activated`, "info");
@@ -4312,14 +3278,10 @@ function DashboardPage() {
     openModal("viewItem");
     closeModal("search");
   };
-  const handleRewards = () => openModal("rewards");
+
   const handleQuickAction = (action) => {
-    if (action === "share") openModal("addItem");
-    if (action === "scan") openModal("scanQR");
-    if (action === "rewards") openModal("rewards");
     if (action === "calendar") openModal("calendar");
     if (action === "analytics") openModal("analytics");
-    if (action === "messages") setActiveNav("messages");
     if (action === "wishlist") setShowWishlist(true);
     if (action === "data") setShowDataManagement(true);
     if (action === "help") showToast("Help Center coming soon!", "info");
@@ -4346,7 +3308,7 @@ function DashboardPage() {
       } else if (action === "complete") {
         const response = await apiCall(`/exchanges/${exchange.id}/status`, {
           method: "PUT",
-          body: JSON.stringify({ status: "completed" }),
+          body: JSON.stringify({ status: "completed" }), // ✅ "completed" not "complete"
         });
         if (response.success) {
           showToast("Exchange completed!", "success");
@@ -4355,7 +3317,7 @@ function DashboardPage() {
       } else if (action === "cancel") {
         const response = await apiCall(`/exchanges/${exchange.id}/status`, {
           method: "PUT",
-          body: JSON.stringify({ status: "cancelled" }),
+          body: JSON.stringify({ status: "canceled" }), // ✅ "canceled" not "cancelled"
         });
         if (response.success) {
           showToast("Exchange cancelled", "success");
@@ -4378,7 +3340,7 @@ function DashboardPage() {
       exchanges,
       events,
       notifications: notificationsData,
-      messages,
+
       wishlist,
       activities,
       stats,
@@ -4433,14 +3395,7 @@ function DashboardPage() {
         e.preventDefault();
         openModal("search");
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-        e.preventDefault();
-        openModal("addItem");
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "m") {
-        e.preventDefault();
-        setActiveNav("messages");
-      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === "w") {
         e.preventDefault();
         setShowWishlist(true);
@@ -4528,10 +3483,18 @@ function DashboardPage() {
                   badge: exchanges.length.toString(),
                 },
                 {
-                  id: "messages",
-                  name: "Messages",
-                  icon: MessageSquare,
-                  badge: messages.filter((m) => m.unread).length.toString(),
+                  id: "reviews",
+                  name: "Reviews",
+                  icon: Star,
+                  badge: reviews.length.toString(),
+                }, // Add this
+                {
+                  id: "notifications",
+                  name: "Notifications",
+                  icon: Bell,
+                  badge: displayNotifications
+                    .filter((n) => !n.read)
+                    .length.toString(),
                 },
                 {
                   id: "calendar",
@@ -4621,81 +3584,11 @@ function DashboardPage() {
                     <p
                       className={`text-sm ${currentTheme.text} opacity-90 mt-1`}
                     >
-                      Welcome back, {user?.fullName?.split(" ")[0] || "User"} •{" "}
-                      {stats.points || 0} points earned
+                      Welcome back, {user?.fullName?.split(" ")[0] || "User"}{" "}
+                      •{" "}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    {/* Search */}
-                    <div className="relative">
-                      <div className="relative">
-                        <Search
-                          className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${currentTheme.text} opacity-70 cursor-pointer`}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Search items, people... (⌘K)"
-                          value={searchQuery}
-                          onChange={(e) => {
-                            setSearchQuery(e.target.value);
-                            setShowSearchSuggestions(true);
-                          }}
-                          onFocus={() => setShowSearchSuggestions(true)}
-                          onBlur={() =>
-                            setTimeout(
-                              () => setShowSearchSuggestions(false),
-                              200,
-                            )
-                          }
-                          onKeyPress={(e) =>
-                            e.key === "Enter" && openModal("search")
-                          }
-                          className={`pl-10 pr-4 py-2 rounded-xl ${currentTheme.searchBg} ${currentTheme.searchText} text-sm focus:outline-none focus:ring-2 focus:ring-white/50 w-64 backdrop-blur-sm transition-all`}
-                        />
-                      </div>
-                      {showSearchSuggestions &&
-                        searchSuggestions.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-20">
-                            {searchSuggestions.map((item) => (
-                              <button
-                                key={item.id}
-                                onClick={() => {
-                                  setSelectedItem(item);
-                                  openModal("viewItem");
-                                  setShowSearchSuggestions(false);
-                                  setSearchQuery("");
-                                }}
-                                className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                              >
-                                <Search className="h-3 w-3 text-gray-400" />
-                                <span className="text-sm">{item.name}</span>
-                                <span className="text-xs text-gray-400 ml-auto">
-                                  {item.category}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                    </div>
-
-                    {/* View Mode Toggle */}
-                    <div
-                      className={`flex items-center gap-1 border-r ${currentTheme.text} border-white/30 pr-3`}
-                    >
-                      <button
-                        onClick={() => setViewMode("grid")}
-                        className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? `${currentTheme.searchBg}` : ""}`}
-                      >
-                        <Grid3x3 className={`h-4 w-4 ${currentTheme.text}`} />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("list")}
-                        className={`p-2 rounded-lg transition-all ${viewMode === "list" ? `${currentTheme.searchBg}` : ""}`}
-                      >
-                        <List className={`h-4 w-4 ${currentTheme.text}`} />
-                      </button>
-                    </div>
-
                     {/* Color Picker */}
                     <button
                       onClick={() => setShowColorPicker(true)}
@@ -4735,15 +3628,6 @@ function DashboardPage() {
                       )}
                     </button>
 
-                    {/* Settings */}
-                    <button
-                      onClick={handleSettings}
-                      className={`p-2 rounded-lg transition-all ${currentTheme.iconHover}`}
-                      title="Settings"
-                    >
-                      <Settings className={`h-5 w-5 ${currentTheme.text}`} />
-                    </button>
-
                     {/* Dark Mode */}
                     <button
                       onClick={handleDarkModeToggle}
@@ -4778,27 +3662,6 @@ function DashboardPage() {
                           </div>
                           {[
                             {
-                              id: "share",
-                              name: "Share Item",
-                              icon: Plus,
-                              color: "text-green-600",
-                              shortcut: "⌘N",
-                            },
-                            {
-                              id: "scan",
-                              name: "Scan QR",
-                              icon: QrCode,
-                              color: "text-blue-600",
-                              shortcut: "⌘Q",
-                            },
-                            {
-                              id: "rewards",
-                              name: "Rewards",
-                              icon: Gift,
-                              color: "text-orange-600",
-                              shortcut: null,
-                            },
-                            {
                               id: "calendar",
                               name: "Calendar",
                               icon: CalendarDays,
@@ -4812,13 +3675,7 @@ function DashboardPage() {
                               color: "text-emerald-600",
                               shortcut: null,
                             },
-                            {
-                              id: "messages",
-                              name: "Messages",
-                              icon: MessageSquare,
-                              color: "text-indigo-600",
-                              shortcut: "⌘M",
-                            },
+
                             {
                               id: "wishlist",
                               name: "Wishlist",
@@ -4855,53 +3712,72 @@ function DashboardPage() {
                         </div>
                       )}
                     </div>
-
-                    {/* Add Item Button */}
-                    <button
-                      onClick={() => openModal("addItem")}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r ${currentTheme.buttonGradient} ${currentTheme.text} hover:shadow-lg transition-all`}
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span className="text-sm font-medium">Share Item</span>
-                    </button>
                   </div>
                 </div>
               </div>
             </header>
 
             <div className="p-8">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {metrics.map((metric, idx) => (
-                  <StatCard
-                    key={idx}
-                    metric={metric}
-                    onClick={() => showToast(`Viewing ${metric.title}`, "info")}
-                  />
-                ))}
-              </div>
-
               {/* My Items Tab */}
+
               {activeNav === "my-items" && (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+                  {/* Header - WITHOUT Add Item Button */}
                   <div className="border-b border-gray-100 dark:border-gray-700 p-6 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          My Items
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          All your shared items
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => openModal("addItem")}
-                        className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
-                      >
-                        <Plus className="h-3 w-3" /> Add New
-                      </button>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        My Items
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Manage all your shared items (
+                        {filteredAndSortedItems.length} items)
+                      </p>
                     </div>
                   </div>
+
+                  {/* Search, Filter, Sort - From Profile Page */}
+                  <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {/* Search Input */}
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search items by name, category..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                        />
+                      </div>
+
+                      {/* Filter Dropdown */}
+                      <select
+                        value={itemsFilter}
+                        onChange={(e) => setItemsFilter(e.target.value)}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-green-500 dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="all">All Items</option>
+                        <option value="available">Available</option>
+                        <option value="borrowed">Borrowed</option>
+                        <option value="pending">Pending</option>
+                      </select>
+
+                      {/* Sort Dropdown */}
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-green-500 dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="date-desc">Newest First</option>
+                        <option value="date-asc">Oldest First</option>
+                        <option value="name-asc">Name (A-Z)</option>
+                        <option value="name-desc">Name (Z-A)</option>
+                        <option value="requests">Most Requested</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -4924,79 +3800,141 @@ function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {myItems.map((item) => (
-                          <tr
-                            key={item._id}
-                            className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                          >
-                            <td className="py-4 px-4 text-sm font-medium">
-                              {item.title}
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              {item.category}
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs ${item.status === "available" ? "bg-green-100 text-green-800" : item.status === "borrowed" ? "bg-yellow-100 text-yellow-800" : "bg-orange-100 text-orange-800"}`}
-                              >
-                                {item.status || "Available"}
-                              </span>
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              {item.requests || 0} requests
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleViewItem(item)}
-                                  className="p-1 hover:bg-gray-100 rounded-lg"
-                                  title="View"
+                        {filteredAndSortedItems.map((item) => {
+                          // Get image URL
+                          const getImageUrl = () => {
+                            if (
+                              item.images &&
+                              item.images.length > 0 &&
+                              item.images[0]?.url
+                            ) {
+                              return item.images[0].url;
+                            }
+                            return null;
+                          };
+                          const imageUrl = getImageUrl();
+
+                          return (
+                            <tr
+                              key={item._id}
+                              className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                            >
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  {/* Item Image */}
+                                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    {imageUrl ? (
+                                      <img
+                                        src={imageUrl}
+                                        alt={item.title}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <Package className="h-5 w-5 text-gray-400" />
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {item.title}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-sm">
+                                {item.category}
+                              </td>
+                              <td className="py-4 px-4">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs ${
+                                    item.status === "available"
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                      : item.status === "borrowed"
+                                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                        : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                                  }`}
                                 >
-                                  <Eye className="h-4 w-4 text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() => handleEditItem(item)}
-                                  className="p-1 hover:bg-gray-100 rounded-lg"
-                                  title="Edit"
-                                >
-                                  <Edit2 className="h-4 w-4 text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setConfirmDelete({ isOpen: true, item })
-                                  }
-                                  className="p-1 hover:bg-gray-100 rounded-lg"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="h-4 w-4 text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    wishlist.find((w) => w.id === item._id)
-                                      ? handleRemoveFromWishlist({
-                                          id: item._id,
-                                          name: item.title,
-                                        })
-                                      : handleAddToWishlist(item)
-                                  }
-                                  className="p-1 hover:bg-gray-100 rounded-lg"
-                                >
-                                  <Heart
-                                    className={`h-4 w-4 transition-all ${wishlist.find((w) => w.id === item._id) ? "fill-red-500 text-red-500" : "text-gray-400 hover:text-red-500"}`}
-                                  />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {myItems.length === 0 && (
+                                  {item.status || "Available"}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-sm">
+                                {item.requests || 0} requests
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex gap-2">
+                                  {/* View button - From Profile Page */}
+                                  <button
+                                    onClick={() =>
+                                      router.push(`/resources/${item._id}`)
+                                    }
+                                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title="View"
+                                  >
+                                    <Eye className="h-4 w-4 text-gray-500" />
+                                  </button>
+
+                                  {/* Edit button - From Profile Page */}
+                                  <button
+                                    onClick={() =>
+                                      router.push(`/resources/${item._id}/edit`)
+                                    }
+                                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="h-4 w-4 text-gray-500" />
+                                  </button>
+
+                                  {/* Delete button - DASHBOARD ORIGINAL (kept as is) */}
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Delete "${item.title}"?`)) {
+                                        (async () => {
+                                          try {
+                                            const response = await apiCall(
+                                              `/resources/${item._id}`,
+                                              {
+                                                method: "DELETE",
+                                              },
+                                            );
+                                            if (
+                                              response &&
+                                              response.success === true
+                                            ) {
+                                              toast.success(
+                                                "Item deleted successfully",
+                                              );
+                                              loadDashboardData();
+                                            } else {
+                                              toast.error(
+                                                response?.message ||
+                                                  "Failed to delete item",
+                                              );
+                                            }
+                                          } catch (error) {
+                                            toast.error(
+                                              error.message ||
+                                                "Failed to delete item",
+                                            );
+                                          }
+                                        })();
+                                      }
+                                    }}
+                                    className="p-1 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredAndSortedItems.length === 0 && (
                           <tr>
                             <td
                               colSpan="5"
                               className="text-center py-12 text-gray-500"
                             >
-                              No items yet. Click "Add New" to share your first
-                              item!
+                              {searchQuery || itemsFilter !== "all"
+                                ? "No items match your search or filter"
+                                : "No items yet"}
                             </td>
                           </tr>
                         )}
@@ -5006,87 +3944,341 @@ function DashboardPage() {
                 </div>
               )}
 
-              {/* Exchanges Tab */}
+              {/* Exchanges Tab - UPGRADED with ExchangesList component */}
               {activeNav === "exchanges" && (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-                  <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                    <div className="flex items-center justify-between">
+                  <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex justify-between items-center">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          Active Exchanges
+                          My Exchanges
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Ongoing transactions
+                          Manage your borrowing and lending activities
                         </p>
                       </div>
-                      <button
-                        onClick={() => openModal("manageExchanges")}
-                        className="text-sm text-green-600 hover:text-green-700 font-medium"
-                      >
-                        Manage All
-                      </button>
+                      <div className="flex gap-2">
+                        {[
+                          "all",
+                          "pending",
+                          "approved",
+                          "active",
+                          "completed",
+                          "canceled",
+                        ].map((filter) => (
+                          <button
+                            key={filter}
+                            onClick={() => setExchangeFilter(filter)}
+                            className={`px-3 py-1 rounded-lg text-sm capitalize transition-colors ${
+                              exchangeFilter === filter
+                                ? "bg-green-500 text-white"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200"
+                            }`}
+                          >
+                            {filter}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
+
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50 dark:bg-gray-800/50">
-                          <th className="text-left py-4 px-4 text-xs font-semibold text-gray-500">
+                      <thead className="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">
                             Item
                           </th>
-                          <th className="text-left py-4 px-4 text-xs font-semibold text-gray-500">
-                            Partner
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">
+                            With
                           </th>
-                          <th className="text-left py-4 px-4 text-xs font-semibold text-gray-500">
-                            Due Date
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">
+                            Period
                           </th>
-                          <th className="text-left py-4 px-4 text-xs font-semibold text-gray-500">
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">
                             Status
                           </th>
-                          <th className="text-left py-4 px-4 text-xs font-semibold text-gray-500">
-                            Action
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">
+                            Actions
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {formattedExchanges.map((exchange) => (
-                          <tr
-                            key={exchange.id}
-                            className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                          >
-                            <td className="py-4 px-4 text-sm">
-                              {exchange.cells[0]}
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              {exchange.cells[1]}
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              {exchange.cells[2]}
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              {exchange.cells[3]}
-                            </td>
-                            <td className="py-4 px-4 text-sm">
-                              <button
-                                onClick={() => {
-                                  setSelectedExchange(exchange);
-                                  openModal("returnItem");
-                                }}
-                                className="text-green-600 hover:text-green-700"
+                        {exchanges
+                          .filter(
+                            (ex) =>
+                              exchangeFilter === "all" ||
+                              ex.status === exchangeFilter,
+                          )
+                          .map((exchange) => {
+                            // ✅ FIXED: Better ID comparison - convert to strings
+                            const currentUserId =
+                              user?._id?.toString() || user?.id?.toString();
+                            const ownerId =
+                              exchange.owner?._id?.toString() ||
+                              exchange.owner?.id?.toString();
+                            const borrowerId =
+                              exchange.borrower?._id?.toString() ||
+                              exchange.borrower?.id?.toString();
+
+                            const isOwner = currentUserId === ownerId;
+                            const isBorrower = currentUserId === borrowerId;
+
+                            // ✅ FIXED: Get the other user's name correctly with fallbacks
+                            let otherUserName = "Unknown User";
+                            if (isOwner && exchange.borrower) {
+                              otherUserName =
+                                exchange.borrower.fullName ||
+                                exchange.borrower.name ||
+                                "Unknown User";
+                            } else if (isBorrower && exchange.owner) {
+                              otherUserName =
+                                exchange.owner.fullName ||
+                                exchange.owner.name ||
+                                "Unknown User";
+                            } else if (!isOwner && !isBorrower) {
+                              // If user is not owner or borrower, show based on who they are
+                              otherUserName =
+                                exchange.owner?.fullName ||
+                                exchange.owner?.name ||
+                                "Unknown User";
+                            }
+
+                            // Debug logging
+                            console.log("=== Exchange Role Check ===");
+                            console.log("Exchange ID:", exchange._id);
+                            console.log("Current User ID:", currentUserId);
+                            console.log("Owner ID:", ownerId);
+                            console.log("Borrower ID:", borrowerId);
+                            console.log("Is Owner:", isOwner);
+                            console.log("Is Borrower:", isBorrower);
+                            console.log("Other User Name:", otherUserName);
+                            console.log("Exchange Status:", exchange.status);
+
+                            // Role-based action visibility
+                            const showApproveDecline =
+                              exchange.status === "pending" && isOwner;
+                            const showCancel =
+                              exchange.status === "pending" && isBorrower;
+                            const showMarkAsPickedUp =
+                              exchange.status === "approved" && isOwner;
+                            const showReturn =
+                              exchange.status === "active" && isBorrower;
+                            const showRate = exchange.status === "completed";
+                            const showDelete =
+                              (exchange.status === "canceled" ||
+                                exchange.status === "cancelled" ||
+                                exchange.status === "completed") &&
+                              (isOwner || isBorrower);
+                            // ✅ Add this debug
+                            console.log("🔍 Delete button debug:", {
+                              exchangeId: exchange._id,
+                              status: exchange.status,
+                              isOwner,
+                              isBorrower,
+                              showDelete,
+                              statusCheck:
+                                exchange.status === "canceled" ||
+                                exchange.status === "cancelled",
+                            });
+                            const hasUserRated = isOwner
+                              ? exchange.ownerRating
+                              : exchange.borrowerRating;
+
+                            return (
+                              <tr
+                                key={exchange._id}
+                                className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                               >
-                                → {exchange.cells[4]}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {formattedExchanges.length === 0 && (
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    {exchange.resource?.images?.[0]?.url && (
+                                      <img
+                                        src={exchange.resource.images[0].url}
+                                        alt=""
+                                        className="w-8 h-8 rounded object-cover"
+                                      />
+                                    )}
+                                    <span className="text-sm font-medium">
+                                      {exchange.resource?.title ||
+                                        "Unknown Item"}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-sm">
+                                  {otherUserName}
+                                </td>
+                                <td className="py-3 px-4 text-sm">
+                                  {exchange.startDate && exchange.endDate
+                                    ? `${new Date(exchange.startDate).toLocaleDateString()} - ${new Date(exchange.endDate).toLocaleDateString()}`
+                                    : "N/A"}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      exchange.status === "pending"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : exchange.status === "approved"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : exchange.status === "active"
+                                            ? "bg-green-100 text-green-800"
+                                            : exchange.status === "completed"
+                                              ? "bg-purple-100 text-purple-800"
+                                              : exchange.status === "canceled"
+                                                ? "bg-red-100 text-red-800"
+                                                : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {exchange.status === "pending"
+                                      ? "⏳ Pending"
+                                      : exchange.status === "approved"
+                                        ? "✅ Approved"
+                                        : exchange.status === "active"
+                                          ? "🔄 Active"
+                                          : exchange.status === "completed"
+                                            ? "🏁 Completed"
+                                            : exchange.status === "canceled"
+                                              ? "❌ Canceled"
+                                              : exchange.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex gap-2 flex-wrap">
+                                    {/* View Button */}
+                                    <button
+                                      onClick={() => {
+                                        const exchangeId =
+                                          exchange._id || exchange.id;
+                                        if (exchangeId) {
+                                          router.push(
+                                            `/exchanges/${exchangeId}`,
+                                          );
+                                        } else {
+                                          toast.error(
+                                            "Cannot view exchange: Invalid exchange data",
+                                          );
+                                        }
+                                      }}
+                                      className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600 transition-colors"
+                                    >
+                                      View Details
+                                    </button>
+
+                                    {/* Approve/Decline for Owner when pending */}
+                                    {showApproveDecline && (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleApproveExchange(exchange)
+                                          }
+                                          className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
+                                        >
+                                          Approve
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleDeclineExchange(exchange)
+                                          }
+                                          className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+                                        >
+                                          Decline
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {/* Cancel for Borrower when pending */}
+                                    {showCancel && (
+                                      <button
+                                        onClick={() =>
+                                          handleCancelExchange(exchange)
+                                        }
+                                        className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+                                      >
+                                        Cancel Request
+                                      </button>
+                                    )}
+
+                                    {/* Mark as Picked Up for Owner when approved */}
+                                    {showMarkAsPickedUp && (
+                                      <button
+                                        onClick={() =>
+                                          handleActivateExchange(exchange)
+                                        }
+                                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
+                                      >
+                                        Mark Picked Up
+                                      </button>
+                                    )}
+
+                                    {/* Return for Borrower when active */}
+                                    {showReturn && (
+                                      <button
+                                        onClick={() =>
+                                          handleReturnExchange(exchange)
+                                        }
+                                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
+                                      >
+                                        Return Item
+                                      </button>
+                                    )}
+
+                                    {/* Rate button */}
+                                    {showRate && !hasUserRated && (
+                                      <button
+                                        onClick={() => {
+                                          console.log(
+                                            "Setting selected exchange:",
+                                            exchange,
+                                          );
+                                          setSelectedExchange(exchange);
+                                          setShowRatingModal(true);
+                                        }}
+                                        className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition-colors"
+                                      >
+                                        Rate {isOwner ? "Borrower" : "Owner"}
+                                      </button>
+                                    )}
+
+                                    {/* Already Rated badge */}
+                                    {hasUserRated && showRate && (
+                                      <span className="px-2 py-1 bg-gray-300 text-gray-600 rounded text-xs">
+                                        ✓ Rated
+                                      </span>
+                                    )}
+
+                                    {/* Delete button for canceled exchanges */}
+                                    {showDelete && (
+                                      <button
+                                        onClick={() => {
+                                          if (
+                                            confirm(
+                                              "Delete this exchange record? This action cannot be undone.",
+                                            )
+                                          ) {
+                                            handleDeleteExchange(exchange);
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors"
+                                      >
+                                        Delete
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        {exchanges.length === 0 && (
                           <tr>
                             <td
                               colSpan="5"
                               className="text-center py-12 text-gray-500"
                             >
-                              No exchanges yet. Start sharing to see
-                              transactions!
+                              <Handshake className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                              <p>No exchanges yet</p>
+                              <p className="text-sm mt-1">
+                                Browse items and start borrowing!
+                              </p>
                             </td>
                           </tr>
                         )}
@@ -5095,60 +4287,68 @@ function DashboardPage() {
                   </div>
                 </div>
               )}
-
-              {/* Messages Tab */}
-              {activeNav === "messages" && (
+              {/* Reviews Tab */}
+              {activeNav === "reviews" && (
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-                  <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Messages
-                    </h3>
+                  <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        My Reviews
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Reviews you've received from others ({reviews.length})
+                      </p>
+                    </div>
                   </div>
-                  {messages.length === 0 ? (
-                    <div className="text-center py-12">
-                      <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">No messages yet</p>
-                      <button
-                        onClick={() => openModal("addItem")}
-                        className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg"
-                      >
-                        Share an Item
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {messages.map((msg) => (
-                        <div
-                          key={msg.id}
-                          onClick={() => handleMessageClick(msg)}
-                          className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${msg.unread ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20" : ""}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                              {msg.avatar}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between">
-                                <p className="font-semibold">{msg.from}</p>
-                                <p className="text-xs text-gray-400">
-                                  {getRelativeTime(msg.time)}
-                                </p>
-                              </div>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {msg.message}
-                              </p>
-                            </div>
-                            {msg.unread && (
-                              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 animate-pulse"></div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="p-6">
+                    <ReviewList
+                      reviews={reviews}
+                      onHelpful={async (reviewId) => {
+                        try {
+                          await apiCall(`/reviews/${reviewId}/helpful`, {
+                            method: "POST",
+                          });
+                          toast.success("Thanks for your feedback!");
+                          fetchReviews(); // Refresh reviews
+                        } catch (error) {
+                          toast.error("Failed to mark as helpful");
+                        }
+                      }}
+                      onReport={(reviewId) => {
+                        toast.info("Report feature coming soon");
+                      }}
+                      onReply={(reviewId, replyText) => {
+                        toast.info("Reply feature coming soon");
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
+              {/* Notifications Tab */}
+              {activeNav === "notifications" && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+                  <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Notifications
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Stay updated with your activity
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <NotificationsList
+                      notifications={displayNotifications}
+                      onMarkAsRead={handleMarkNotificationRead}
+                      onMarkAllRead={handleMarkAllRead}
+                      onDelete={handleDeleteNotification}
+                      onClearAll={handleClearAllNotifications}
+                    />
+                  </div>
+                </div>
+              )}
               {/* Overview Tab */}
               {activeNav === "overview" && (
                 <>
@@ -5209,89 +4409,8 @@ function DashboardPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-                          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                            <h3 className="text-lg font-semibold">
-                              Popular Items
-                            </h3>
-                          </div>
-                          <div className="p-6">
-                            {popularItems.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <item.icon className="h-4 w-4 text-gray-500" />
-                                  <span className="text-sm">{item.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-green-600">
-                                    {item.trend}%
-                                  </span>
-                                  <span className="text-xs text-gray-400">
-                                    {item.requests} requests
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-                          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                            <h3 className="text-lg font-semibold">
-                              Achievements
-                            </h3>
-                          </div>
-                          <div className="p-6">
-                            <div className="grid grid-cols-2 gap-3">
-                              {badges.map((badge, idx) => (
-                                <div
-                                  key={idx}
-                                  className={`p-3 rounded-xl text-center transition-all ${badge.earned ? "bg-gray-50 dark:bg-gray-700 hover:scale-105 cursor-pointer" : "bg-gray-100 dark:bg-gray-800 opacity-50"}`}
-                                >
-                                  <div
-                                    className={`w-10 h-10 mx-auto bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center mb-2 shadow-md`}
-                                  >
-                                    <badge.icon className="h-5 w-5 text-white" />
-                                  </div>
-                                  <p className="text-xs font-medium">
-                                    {badge.name}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                     <div className="space-y-6">
-                      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                          <h3 className="text-lg font-semibold">Quick Stats</h3>
-                        </div>
-                        <div className="p-6">
-                          <div className="grid grid-cols-2 gap-3">
-                            {quickStats.map((stat, idx) => (
-                              <div
-                                key={idx}
-                                className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-600 rounded-xl p-3 hover:scale-105 transition-transform cursor-pointer shadow-sm"
-                              >
-                                <stat.icon
-                                  className={`h-5 w-5 ${stat.color} mb-2`}
-                                />
-                                <p className="text-lg font-bold">
-                                  {stat.value}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {stat.label}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
                       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
                           <h3 className="text-lg font-semibold">
@@ -5317,33 +4436,7 @@ function DashboardPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-2xl">
-                          <h3 className="text-lg font-semibold">
-                            Recent Notifications
-                          </h3>
-                        </div>
-                        <div className="p-6">
-                          {(displayNotifications || [])
-                            .slice(0, 3)
-                            .map((notif) => (
-                              <div
-                                key={notif.id}
-                                className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2 hover:shadow-md transition-all"
-                              >
-                                <p className="text-sm font-medium">
-                                  {notif.title}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {notif.message}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-1">
-                                  {getRelativeTime(notif.time)}
-                                </p>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700"></div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
@@ -5351,41 +4444,9 @@ function DashboardPage() {
                       items={myItems}
                       onItemClick={handleViewItem}
                     />
-                    <AchievementProgress
-                      user={user}
-                      items={myItems}
-                      exchanges={exchanges}
-                    />
                   </div>
-                  <div className="grid grid-cols-1 gap-6 mt-8">
-                    <ActivityFeed
-                      activities={activities}
-                      onLike={handleLike}
-                      onShare={(item) => {
-                        setSelectedShareItem(item);
-                        openModal("share");
-                      }}
-                      showAll={showAllActivities}
-                      onToggleShowAll={() =>
-                        setShowAllActivities(!showAllActivities)
-                      }
-                    />
-                  </div>
+
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-8">
-                    <button
-                      onClick={() => openModal("scanQR")}
-                      className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg text-center border border-gray-100 dark:border-gray-700 group hover:-translate-y-1"
-                    >
-                      <QrCode className="h-5 w-5 text-green-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-medium">Scan QR</p>
-                    </button>
-                    <button
-                      onClick={handleRewards}
-                      className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg text-center border border-gray-100 dark:border-gray-700 group hover:-translate-y-1"
-                    >
-                      <Gift className="h-5 w-5 text-orange-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-medium">Rewards</p>
-                    </button>
                     <button
                       onClick={() => setShowWishlist(true)}
                       className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg text-center border border-gray-100 dark:border-gray-700 group hover:-translate-y-1"
@@ -5407,13 +4468,6 @@ function DashboardPage() {
                       <TrendingUp className="h-5 w-5 text-emerald-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
                       <p className="text-xs font-medium">Analytics</p>
                     </button>
-                    <button
-                      onClick={() => openModal("share")}
-                      className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg text-center border border-gray-100 dark:border-gray-700 group hover:-translate-y-1"
-                    >
-                      <Share2 className="h-5 w-5 text-indigo-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-medium">Share</p>
-                    </button>
                   </div>
                 </>
               )}
@@ -5423,11 +4477,7 @@ function DashboardPage() {
 
         <Footer />
       </div>
-      <AddItemModal
-        isOpen={modals.addItem}
-        onClose={() => closeModal("addItem")}
-        onAdd={handleAddItem}
-      />
+
       <RequestItemModal
         isOpen={modals.requestItem}
         onClose={() => setModals((prev) => ({ ...prev, requestItem: false }))}
@@ -5446,15 +4496,7 @@ function DashboardPage() {
         exchange={selectedExchange}
         onReturn={handleReturnItem}
       />
-      <SettingsModal
-        isOpen={modals.settings}
-        onClose={() => closeModal("settings")}
-        darkMode={isDarkMode}
-        onDarkModeToggle={handleDarkModeToggle}
-        user={user}
-        onUpdateUser={() => {}}
-        onOpenDataManagement={() => setShowDataManagement(true)}
-      />
+
       <NotificationsModal
         isOpen={modals.notifications}
         onClose={() => closeModal("notifications")}
@@ -5464,12 +4506,7 @@ function DashboardPage() {
         onDelete={handleDeleteNotification}
         onClearAll={handleClearAllNotifications}
       />
-      <SearchModal
-        isOpen={modals.search}
-        onClose={() => closeModal("search")}
-        items={myItems}
-        onSelect={handleSelectSearchItem}
-      />
+
       <CalendarModal
         isOpen={modals.calendar}
         onClose={() => closeModal("calendar")}
@@ -5487,12 +4524,7 @@ function DashboardPage() {
         item={selectedItem}
         onSave={handleSaveItem}
       />
-      <MessageDetailModal
-        isOpen={modals.messageDetail}
-        onClose={() => closeModal("messageDetail")}
-        message={selectedMessage}
-        onReply={handleSendReply}
-      />
+
       <ManageExchangesModal
         isOpen={modals.manageExchanges}
         onClose={() => closeModal("manageExchanges")}
@@ -5504,24 +4536,7 @@ function DashboardPage() {
           openModal("returnItem");
         }}
       />
-      <RewardsModal
-        isOpen={modals.rewards}
-        onClose={() => closeModal("rewards")}
-        points={stats.points || 0}
-        onRedeem={handleRedeemReward}
-      />
-      <ShareModal
-        isOpen={modals.share}
-        onClose={() => closeModal("share")}
-        item={selectedShareItem}
-        onShare={handleShare}
-      />
-      <ScanQRModal
-        isOpen={modals.scanQR}
-        onClose={() => closeModal("scanQR")}
-        onScan={handleQRScan}
-        items={myItems}
-      />
+
       <ViewItemModal
         isOpen={modals.viewItem}
         onClose={() => closeModal("viewItem")}
@@ -5555,8 +4570,24 @@ function DashboardPage() {
         isOpen={showWishlist}
         onClose={() => setShowWishlist(false)}
         wishlist={wishlist}
-        onRemoveFromWishlist={handleRemoveFromWishlist}
-        onMoveToRequest={handleMoveToRequest}
+        onRemoveFromWishlist={async (item) => {
+          try {
+            const response = await apiCall(`/wishlist/${item.id}`, {
+              method: "DELETE",
+            });
+            if (response.success) {
+              setWishlist((prev) => prev.filter((w) => w.id !== item.id));
+              toast.success("Removed from wishlist");
+            }
+          } catch (error) {
+            toast.error("Failed to remove from wishlist");
+          }
+        }}
+        onMoveToRequest={(item) => {
+          setSelectedItem(item);
+          setShowWishlist(false);
+          openModal("requestItem");
+        }}
       />
       <DataManagementModal
         isOpen={showDataManagement}
@@ -5574,15 +4605,28 @@ function DashboardPage() {
         type="danger"
       />
 
-      {toast && (
+      {notificationToast && (
         <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-right-5">
           <div
-            className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === "success" ? "bg-green-500" : toast.type === "error" ? "bg-red-500" : toast.type === "warning" ? "bg-yellow-500" : "bg-blue-500"} text-white`}
+            className={`px-4 py-3 rounded-lg shadow-lg ${notificationToast.type === "success" ? "bg-green-500" : notificationToast.type === "error" ? "bg-red-500" : notificationToast.type === "warning" ? "bg-yellow-500" : "bg-blue-500"} text-white`}
           >
-            {toast.message}
+            {notificationToast.message}
           </div>
         </div>
       )}
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => {
+          setShowRatingModal(false);
+          setSelectedExchange(null);
+          // Refresh to ensure UI is up to date
+          loadDashboardData();
+        }}
+        exchange={selectedExchange}
+        onSubmit={handleRateExchange}
+        currentUser={user}
+      />
     </ErrorBoundary>
   );
 }

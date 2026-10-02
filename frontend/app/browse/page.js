@@ -1,9 +1,10 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
+import ZoomableView from "../../components/browse/ZoomableView";
 import {
   Search,
   Filter,
@@ -30,11 +31,13 @@ import LoadingSkeleton from "../../components/browse/LoadingSkeleton";
 import SaveSearchModal from "../../components/browse/SaveSearchModal";
 import QuickViewModal from "../../components/browse/QuickViewModal";
 import { useInView } from "react-intersection-observer";
+import toast, { Toaster } from "react-hot-toast";
 
 export default function BrowsePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, apiCall } = useAuth();
+  const { socket } = useSocket();
 
   // State
   const [resources, setResources] = useState([]);
@@ -102,6 +105,108 @@ export default function BrowsePage() {
     if (saved) setSavedSearches(JSON.parse(saved));
   }, []);
 
+  // ============ DEFINE loadResources FIRST ============
+  const loadResources = useCallback(
+    async (reset = true, pageOverride = null) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const currentPage = reset
+          ? 1
+          : pageOverride !== null
+            ? pageOverride
+            : pagination.page + 1;
+
+        const params = new URLSearchParams();
+        params.append("page", currentPage);
+        params.append("limit", pagination.limit);
+        if (debouncedSearch) params.append("search", debouncedSearch);
+        if (filters.sortBy && filters.sortBy !== "newest")
+          params.append("sortBy", filters.sortBy);
+        if (filters.resourceType.length)
+          params.append("resourceType", filters.resourceType.join(","));
+        if (filters.theme.length)
+          params.append("theme", filters.theme.join(","));
+        if (filters.availability && filters.availability !== "all")
+          params.append("availability", filters.availability);
+        if (filters.categories.length)
+          params.append("category", filters.categories.join(","));
+        if (filters.minPrice !== null)
+          params.append("minPrice", filters.minPrice);
+        if (filters.maxPrice !== null)
+          params.append("maxPrice", filters.maxPrice);
+        if (filters.condition) params.append("condition", filters.condition);
+        if (filters.minRating) params.append("minRating", filters.minRating);
+        if (filters.location) params.append("location", filters.location);
+        if (filters.distance) params.append("distance", filters.distance);
+
+        const data = await apiCall(`/resources?${params.toString()}`);
+
+        if (data.success) {
+          if (reset) {
+            setResources(data.resources);
+          } else {
+            setResources((prev) => [...prev, ...data.resources]);
+          }
+          setPagination(data.pagination);
+        } else {
+          setError(data.message || "Failed to load resources");
+        }
+      } catch (err) {
+        console.error("Load resources error:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [apiCall, debouncedSearch, filters, pagination.limit],
+  );
+
+  // ============ Socket Effect - AFTER loadResources is defined ============
+  useEffect(() => {
+    if (!socket) {
+      console.log("Socket not connected, skipping real-time updates");
+      return;
+    }
+
+    console.log("Setting up real-time listeners for Browse page");
+
+    const handleResourceStatusChange = (data) => {
+      console.log("🔄 Resource status changed:", data);
+
+      if (data.status === "borrowed") {
+        setResources((prev) => prev.filter((r) => r._id !== data.resourceId));
+        setPagination((prev) => ({
+          ...prev,
+          total: Math.max(0, prev.total - 1),
+        }));
+        toast.info(`${data.title || "An item"} has been borrowed`);
+      } else if (data.status === "available") {
+        if (!loading) {
+          loadResources(true);
+          toast.info(`${data.title || "An item"} is now available!`);
+        }
+      }
+    };
+
+    const handleNewResource = (data) => {
+      console.log("📦 New resource added:", data);
+      if (!loading) {
+        loadResources(true);
+        toast.success(`New item: ${data.title}`);
+      }
+    };
+
+    socket.on("resource-status-changed", handleResourceStatusChange);
+    socket.on("new-resource", handleNewResource);
+
+    return () => {
+      socket.off("resource-status-changed", handleResourceStatusChange);
+      socket.off("new-resource", handleNewResource);
+    };
+  }, [socket, loadResources, loading]);
+
   // Toggle functions
   const toggleResourceType = (typeId) => {
     setFilters((prev) => ({
@@ -141,65 +246,6 @@ export default function BrowsePage() {
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
-  // Load resources - FIXED: removed pagination.page from dependencies
-  const loadResources = useCallback(
-    async (reset = true, pageOverride = null) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const currentPage = reset
-          ? 1
-          : pageOverride !== null
-            ? pageOverride
-            : pagination.page + 1;
-
-        const params = new URLSearchParams();
-        params.append("page", currentPage);
-        params.append("limit", pagination.limit);
-        if (debouncedSearch) params.append("search", debouncedSearch);
-        if (filters.sortBy && filters.sortBy !== "newest")
-          params.append("sortBy", filters.sortBy);
-        if (filters.resourceType.length)
-          params.append("resourceType", filters.resourceType.join(","));
-        if (filters.theme.length)
-          params.append("theme", filters.theme.join(","));
-        if (filters.availability && filters.availability !== "all")
-          params.append("availability", filters.availability);
-        if (filters.categories.length)
-          params.append("category", filters.categories.join(","));
-        if (filters.minPrice !== null)
-          params.append("minPrice", filters.minPrice);
-        if (filters.maxPrice !== null)
-          params.append("maxPrice", filters.maxPrice);
-        if (filters.condition) params.append("condition", filters.condition);
-        if (filters.minRating) params.append("minRating", filters.minRating);
-        if (filters.location) params.append("location", filters.location);
-        if (filters.distance) params.append("distance", filters.distance);
-
-        // FIXED: Use apiCall instead of fetch
-        const data = await apiCall(`/resources?${params.toString()}`);
-
-        if (data.success) {
-          if (reset) {
-            setResources(data.resources);
-          } else {
-            setResources((prev) => [...prev, ...data.resources]);
-          }
-          setPagination(data.pagination);
-        } else {
-          setError(data.message || "Failed to load resources");
-        }
-      } catch (err) {
-        console.error("Load resources error:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [apiCall, debouncedSearch, filters, pagination.limit],
-  );
-
   // Load more on scroll
   useEffect(() => {
     if (inView && pagination.hasMore && !loading) {
@@ -208,7 +254,7 @@ export default function BrowsePage() {
     }
   }, [inView, pagination.hasMore, loading, pagination.page, loadResources]);
 
-  // Initial load - FIXED: runs when filters/debouncedSearch change
+  // Initial load - runs when filters/debouncedSearch change
   useEffect(() => {
     loadResources(true);
   }, [
@@ -233,7 +279,6 @@ export default function BrowsePage() {
 
   const handleClearSearch = () => setSearchQuery("");
 
-  // Toggle bookmark - FIXED: use apiCall
   const handleToggleBookmark = async (resourceId) => {
     if (!user) {
       router.push("/login?redirect=/browse");
@@ -256,7 +301,6 @@ export default function BrowsePage() {
     }
   };
 
-  // Toggle like - FIXED: use apiCall
   const handleToggleLike = async (resourceId) => {
     if (!user) {
       router.push("/login?redirect=/browse");
@@ -281,7 +325,6 @@ export default function BrowsePage() {
     setShowQuickView(true);
   };
 
-  // Export - FIXED: use apiCall
   const handleExport = async (format) => {
     try {
       const params = new URLSearchParams();
@@ -347,6 +390,7 @@ export default function BrowsePage() {
 
   return (
     <>
+      <Toaster position="top-right" />
       <AnnouncementBar />
       <Header />
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -480,17 +524,65 @@ export default function BrowsePage() {
                 </div>
               </div>
 
-              {/* Category Pills */}
+              {/* Availability Filter Buttons */}
               <div className="flex flex-wrap gap-2 mb-6">
+                <button
+                  onClick={() =>
+                    handleFilterChange(
+                      "availability",
+                      filters.availability === "all" ? "available" : "all",
+                    )
+                  }
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    filters.availability === "available"
+                      ? "bg-green-500 text-white shadow-md"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                  }`}
+                >
+                  ✅ Available Now
+                </button>
+                <button
+                  onClick={() =>
+                    handleFilterChange(
+                      "availability",
+                      filters.availability === "borrowed" ? "all" : "borrowed",
+                    )
+                  }
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    filters.availability === "borrowed"
+                      ? "bg-orange-500 text-white shadow-md"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200"
+                  }`}
+                >
+                  📖 Currently Borrowed
+                </button>
+              </div>
+
+              {/* Category Pills - Only one category at a time */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {/* "All Categories" button - shows when nothing is selected */}
+                <button
+                  onClick={() => handleFilterChange("categories", [])}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    filters.categories.length === 0
+                      ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  All Categories
+                </button>
+
                 {categories.map((category) => (
                   <button
                     key={category}
                     onClick={() => {
+                      // If same category is clicked again, clear selection (show all)
+                      // Otherwise, select only this category
                       const newCategories = filters.categories.includes(
                         category,
                       )
-                        ? filters.categories.filter((c) => c !== category)
-                        : [...filters.categories, category];
+                        ? []
+                        : [category];
                       handleFilterChange("categories", newCategories);
                     }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
@@ -531,12 +623,24 @@ export default function BrowsePage() {
                 />
               ) : (
                 <>
-                  {viewMode === "map" ? (
+                  {/* Zoomable View */}
+                  {viewMode === "zoomable" ? (
+                    <ZoomableView
+                      resources={resources}
+                      onQuickView={handleQuickView}
+                      onBookmark={handleToggleBookmark}
+                      onLike={handleToggleLike}
+                      bookmarked={bookmarked}
+                      liked={liked}
+                    />
+                  ) : viewMode === "map" ? (
+                    /* Map View */
                     <MapView
                       resources={resources}
                       onMarkerClick={handleQuickView}
                     />
                   ) : (
+                    /* Grid or List View */
                     <div
                       className={
                         viewMode === "list"
@@ -559,23 +663,25 @@ export default function BrowsePage() {
                     </div>
                   )}
 
-                  {/* Load More Trigger */}
-                  {pagination.hasMore && (
-                    <div ref={ref} className="flex justify-center py-8">
-                      {loading ? (
-                        <Loader2 className="h-6 w-6 animate-spin text-green-500" />
-                      ) : (
-                        <button
-                          onClick={() =>
-                            loadResources(false, pagination.page + 1)
-                          }
-                          className="px-6 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          Load More
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* Load More Trigger - Only for Grid/List views */}
+                  {viewMode !== "map" &&
+                    viewMode !== "zoomable" &&
+                    pagination.hasMore && (
+                      <div ref={ref} className="flex justify-center py-8">
+                        {loading ? (
+                          <Loader2 className="h-6 w-6 animate-spin text-green-500" />
+                        ) : (
+                          <button
+                            onClick={() =>
+                              loadResources(false, pagination.page + 1)
+                            }
+                            className="px-6 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            Load More
+                          </button>
+                        )}
+                      </div>
+                    )}
                 </>
               )}
             </div>

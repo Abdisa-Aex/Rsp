@@ -7,19 +7,17 @@ const ExchangesTab = ({
   exchanges,
   onReturn,
   onRate,
-  onApprove, // ← Add this prop
-  onDecline, // ← Add this prop
-  initialFilter = "all", // ← Optional initial filter
+  onApprove,
+  onDecline,
+  apiCall, // ← Make sure this is received
+  initialFilter = "all",
 }) => {
-  // Manage filter state locally
   const [filter, setFilter] = useState(initialFilter);
 
-  // If parent doesn't provide approve/decline, create default handlers
   const handleApprove =
     onApprove ||
     (async (exchange) => {
       console.log("Approve handler not provided", exchange);
-      // Default implementation could call an API
     });
 
   const handleDecline =
@@ -37,6 +35,7 @@ const ExchangesTab = ({
       onDecline={handleDecline}
       onReturn={onReturn}
       onRate={onRate}
+      apiCall={apiCall} // ← Pass it through
     />
   );
 };

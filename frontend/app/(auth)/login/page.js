@@ -736,14 +736,8 @@ export default function LoginPage() {
                 >
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowMagicLink(true)}
-                  className="text-sm text-blue-600 hover:text-blue-500 transition-colors"
-                  aria-label="Sign in with magic link"
-                >
-                  Use magic link
-                </button>
+
+
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -776,8 +770,8 @@ export default function LoginPage() {
 
               {password && (
                 <>
-                  <PasswordStrengthMeter password={password} />
-                  <PasswordRequirements password={password} />
+                  {/* <PasswordStrengthMeter password={password} /> */}
+                  {/* <PasswordRequirements password={password} /> */}
                 </>
               )}
             </div>
@@ -806,45 +800,7 @@ export default function LoginPage() {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300" />
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">
-                  Or continue with
-                </span>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                aria-label="Sign in with Google"
-              >
-                <span className="text-sm text-gray-700">Google</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                aria-label="Sign in with Facebook"
-              >
-                <Facebook className="h-5 w-5 text-blue-600" />
-                <span className="text-sm text-gray-700">Facebook</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                aria-label="Sign in with Apple"
-              >
-                <Apple className="h-5 w-5 text-gray-700" />
-                <span className="text-sm text-gray-700">Apple</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                aria-label="Sign in with Microsoft"
-              >
-                <Smartphone className="h-5 w-5 text-blue-600" />
-                <span className="text-sm text-gray-700">Microsoft</span>
-              </button>
             </div>
 
             <button
@@ -907,12 +863,12 @@ export default function LoginPage() {
           onRevokeAll={handleRevokeAllSessions}
         />
 
-        <MagicLinkModal
+        {/* <MagicLinkModal
           isOpen={showMagicLink}
           onClose={() => setShowMagicLink(false)}
           onSend={handleMagicLink}
           email={email}
-        />
+        /> */}
       </div>
       <Footer />
     </>

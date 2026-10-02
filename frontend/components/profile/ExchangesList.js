@@ -1,4 +1,4 @@
-"use client";
+// "use client";
 
 import { useState } from "react";
 import {
@@ -16,7 +16,8 @@ import {
   XCircle,
   AlertCircle,
 } from "lucide-react";
-import toast from "react-hot-toast"; 
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { Package } from "lucide-react";
 import Button from "components/ui/Button";
 import Badge from "components/ui/Badge";
@@ -29,14 +30,72 @@ const ExchangesList = ({
   onDecline,
   onReturn,
   onRate,
+  onView,
+  apiCall,
+  currentUserId,
 }) => {
+  const router = useRouter();
   const [expandedId, setExpandedId] = useState(null);
 
-  // Transform exchanges to expected format if needed
+  // // Get current user ID from localStorage or use a prop
+
+
   const normalizeExchange = (exchange) => {
+    // const currentUserId = getCurrentUserId();/
+
+    // Debug: Log what we're getting
+    console.log("Exchange raw data:", {
+      owner: exchange.owner,
+      borrower: exchange.borrower,
+      ownerType: typeof exchange.owner,
+      borrowerType: typeof exchange.borrower,
+    });
+
+    // Helper to get the actual ID from owner/borrower (could be object or string)
+    const getUserId = (user) => {
+      if (!user) return null;
+      if (typeof user === "string") return user;
+      if (user._id) return user._id;
+      return null;
+    };
+
+    // Helper to get the name
+ const getUserName = (user) => {
+   if (!user) return "Unknown";
+
+   if (typeof user === "string") {
+     return "Unknown";
+   }
+
+   return user.fullName || user.username || user.name || "Unknown";
+ };
+
+  const ownerId = getUserId(exchange.owner);
+  const borrowerId = getUserId(exchange.borrower);
+
+  const ownerName = getUserName(exchange.owner);
+  const borrowerName = getUserName(exchange.borrower);
+
+  // FIX ObjectId/string mismatch
+  const currentId = String(currentUserId || "");
+
+  console.log("USER CHECK:", {
+    currentId,
+    ownerId,
+    borrowerId,
+    ownerName,
+    borrowerName,
+  });
+
+  // Determine which one is the OTHER participant
+  const isCurrentUserOwner = String(ownerId) === currentId;
+
+  const otherUserId = isCurrentUserOwner ? borrowerId : ownerId;
+
+  const otherUserName = isCurrentUserOwner ? borrowerName : ownerName;
+
     return {
-      id: exchange.id || exchange._id,
-      // Map 'lent' to 'lend' for display consistency
+      id: exchange._id,
       type:
         exchange.type === "lent"
           ? "lend"
@@ -46,12 +105,21 @@ const ExchangesList = ({
       resourceTitle:
         exchange.resource?.title || exchange.title || "Unknown Item",
       resourceDescription: exchange.resource?.description || "",
-      resourceId: exchange.resource?.id || exchange.resourceId,
+      resourceId: exchange.resource?._id,
       location:
         exchange.resource?.location || exchange.location || "Not specified",
-      partner: exchange.partner || {
-        fullName: exchange.otherUser?.fullName || "Unknown User",
+
+      // Store IDs for message button
+      ownerId: ownerId,
+      borrowerId: borrowerId,
+      otherUserId: otherUserId, // ← This is what the message button needs
+      otherUserName: otherUserName,
+
+      partner: {
+        id: otherUserId,
+        fullName: otherUserName,
       },
+
       startDate: exchange.startDate,
       endDate: exchange.endDate,
       duration:
@@ -64,7 +132,6 @@ const ExchangesList = ({
       totalAmount: exchange.totalAmount || 0,
       rated: exchange.rated || false,
       lastMessage: exchange.lastMessage || null,
-      conversationId: exchange.conversationId || exchange._id,
     };
   };
 
@@ -309,34 +376,18 @@ const ExchangesList = ({
                       </Button>
                     </>
                   )}
-                  <Button
-                    variant="outline"
-                    size="small"
-                    onClick={() => {
-                      const conversationId =
-                        exchange.conversationId || exchange.id || exchange._id;
-                      if (conversationId && conversationId !== "undefined") {
-                        window.location.href = `/messages/${conversationId}`;
-                      } else {
-                        console.error("No conversation ID found", exchange);
-                        toast.error("Cannot open conversation");
-                      }
-                    }}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    Message
-                  </Button>
-                 
-                 
+
+                  {/* ========== FIXED MESSAGE BUTTON ========== */}
+
+
+
+                  {/* RETURN BUTTON */}
                   {exchange.status === "active" && onReturn && (
                     <Button
                       variant="primary"
                       size="small"
                       onClick={() => {
-                        console.log("Return clicked, exchange:", exchange);
-                        // Make sure exchange has an id
-                        if (!exchange.id && !exchange._id) {
-                          console.error("Exchange has no ID!", exchange);
+                        if (!exchange.id) {
                           toast.error("Cannot return: Exchange ID missing");
                           return;
                         }
@@ -347,6 +398,8 @@ const ExchangesList = ({
                       Return Item
                     </Button>
                   )}
+
+                  {/* RATE BUTTON */}
                   {exchange.status === "completed" &&
                     !exchange.rated &&
                     onRate && (
@@ -359,21 +412,27 @@ const ExchangesList = ({
                         Rate Experience
                       </Button>
                     )}
-                  <Button
-                    variant="outline"
-                    size="small"
+
+                  {/* VIEW BUTTON */}
+                  <button
                     onClick={() => {
                       const resourceId = exchange.resourceId;
-                      if (resourceId && resourceId !== "undefined") {
-                        window.location.href = `/resources/${resourceId}`;
+                      if (resourceId) {
+                        const itemObject = {
+                          _id: resourceId,
+                          id: resourceId,
+                          title: exchange.resourceTitle,
+                        };
+                        onView?.(itemObject);
                       } else {
-                        console.error("No resource ID found", exchange);
+                        toast.error("Cannot view resource: ID missing");
                       }
                     }}
+                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="View Resource"
                   >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View Item
-                  </Button>
+                    <Eye className="h-4 w-4 text-gray-500" />
+                  </button>
                 </div>
               </div>
             )}

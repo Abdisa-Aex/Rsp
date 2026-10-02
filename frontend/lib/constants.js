@@ -174,32 +174,8 @@ export const howItWorks = [
   },
 ];
 
-// Community Stats
-export const communityStats = {
-  totalResources: 1842,
-  activeMembers: 1256,
-  totalExchanges: 3421,
-  cities: 24,
-  successRate: 94,
-  averageRating: 4.7,
-  monthlyGrowth: 23,
-  topCategories: [
-    { name: "Tools", percentage: 28, count: 516 },
-    { name: "Books", percentage: 22, count: 405 },
-    { name: "Gardening", percentage: 15, count: 276 },
-    { name: "Electronics", percentage: 12, count: 221 },
-    { name: "Kitchen", percentage: 10, count: 184 },
-  ],
-  dailyActivity: [
-    { day: "Mon", views: 1245, exchanges: 89 },
-    { day: "Tue", views: 1389, exchanges: 102 },
-    { day: "Wed", views: 1567, exchanges: 134 },
-    { day: "Thu", views: 1423, exchanges: 118 },
-    { day: "Fri", views: 1789, exchanges: 156 },
-    { day: "Sat", views: 2102, exchanges: 189 },
-    { day: "Sun", views: 1987, exchanges: 167 },
-  ],
-};
+
+
 
 // Sort Options
 export const sortOptions = [

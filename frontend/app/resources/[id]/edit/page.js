@@ -224,7 +224,8 @@ export default function EditResourcePage() {
      if (response.success) {
        toast.success("Resource updated successfully!");
        setHasChanges(false);
-       router.push(`/resources/${resourceId}`);
+      //  router.push(`/resources/${resourceId}`);
+      router.push("/dashboard?tab=my-items");
      } else {
        toast.error(response.message || "Failed to update");
      }

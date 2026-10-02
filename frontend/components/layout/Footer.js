@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -13,8 +12,6 @@ import { Linkedin } from "react-feather";
 import { Instagram } from "react-feather";
 import { Twitter } from "react-feather";
 import { Facebook } from "react-feather";
-
-
 
 const Footer = () => {
   const { user, isAuthenticated } = useAuth();
@@ -50,28 +47,21 @@ const Footer = () => {
       { name: "Share Resources", href: "/share" },
       { name: "How It Works", href: "/how-it-works" },
       { name: "Safety Guidelines", href: "/safety" },
-      { name: "Success Stories", href: "/stories" },
     ],
     Community: [
       { name: "Community Guidelines", href: "/guidelines" },
-      { name: "Become a Partner", href: "/partner" },
-      { name: "Volunteer", href: "/volunteer" },
       { name: "Events", href: "/events" },
-      { name: "Forum", href: "/forum" },
     ],
     Support: [
       { name: "Help Center", href: "/help" },
       { name: "Contact Us", href: "/contact" },
       { name: "Report an Issue", href: "/report" },
       { name: "FAQ", href: "/faq" },
-      { name: "Status", href: "/status" },
     ],
     Legal: [
       { name: "Terms of Service", href: "/terms" },
       { name: "Privacy Policy", href: "/privacy" },
       { name: "Cookie Policy", href: "/cookies" },
-      { name: "Accessibility", href: "/accessibility" },
-      { name: "Data Request", href: "/data-request" },
     ],
   };
 
@@ -144,7 +134,6 @@ const Footer = () => {
                 className="text-gray-400 hover:text-red-600 transition-colors"
                 aria-label="YouTube"
               >
-               
                 <Youtube className="h-5 w-5" />
               </a>
 
@@ -159,7 +148,7 @@ const Footer = () => {
               </a>
             </div>
 
-            <AppBadges variant="compact" />
+            {/* <AppBadges variant="compact" /> */}
           </div>
 
           {/* Links Columns */}

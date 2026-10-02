@@ -15,11 +15,11 @@ import {
   Video,
   MoreVertical,
   Forward,
-   
+
   Volume2, // ← ADD THIS
 
-  
- 
+
+
   CheckSquare, // ← ADD THIS
   Square, // ← ADD THIS
   Info,
@@ -212,6 +212,7 @@ export default function MessagesPage() {
   const { socket, isConnected } = useSocket();
 
   // State
+  const [isDeleting, setIsDeleting] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState({});
@@ -464,24 +465,91 @@ export default function MessagesPage() {
   // ============ DELETE MESSAGE ============
   const deleteMessage = useCallback(
     async (messageId, forEveryone = false) => {
-      try {
-        const endpoint = forEveryone
-          ? `/messages/${messageId}/for-everyone`
-          : `/messages/${messageId}`;
-        await apiCall(endpoint, { method: "DELETE" });
+      // Find the actual message to get the correct ID
+      const currentMessages = messages[activeChat._id] || [];
+      const targetMessage = currentMessages.find(
+        (m) => m.id === messageId || m._id === messageId,
+      );
 
+      if (!targetMessage) {
+        toast.error("Message not found");
+        return;
+      }
+
+      // Prevent deleting messages that haven't been sent yet
+      if (targetMessage.status === "sending") {
         setMessages((prev) => ({
           ...prev,
           [activeChat._id]: prev[activeChat._id].filter(
             (m) => m.id !== messageId && m._id !== messageId,
           ),
         }));
-        toast.success("Message deleted");
+        toast.success("Message removed");
+        return;
+      }
+
+      const confirmMessage = forEveryone
+        ? "Delete this message for everyone? This action cannot be undone."
+        : "Delete this message for yourself?";
+
+      if (!confirm(confirmMessage)) return;
+
+      setSending(true);
+
+      try {
+        let endpoint;
+        if (forEveryone) {
+          endpoint = `/messages/${targetMessage._id}/for-everyone`;
+        } else {
+          endpoint = `/messages/${targetMessage._id}`;
+        }
+
+        const response = await apiCall(endpoint, { method: "DELETE" });
+
+        if (response.success) {
+          if (forEveryone) {
+            // Replace the message content for "delete for everyone"
+            setMessages((prev) => ({
+              ...prev,
+              [activeChat._id]: prev[activeChat._id].map((msg) =>
+                msg.id === messageId || msg._id === messageId
+                  ? {
+                      ...msg,
+                      text: "This message was deleted",
+                      deleted: true,
+                      deletedForEveryone: true,
+                    }
+                  : msg,
+              ),
+            }));
+            toast.success("Message deleted for everyone");
+          } else {
+            // Completely remove the message for "delete for me"
+            setMessages((prev) => ({
+              ...prev,
+              [activeChat._id]: prev[activeChat._id].filter(
+                (msg) => msg.id !== messageId && msg._id !== messageId,
+              ),
+            }));
+            toast.success("Message deleted");
+          }
+
+          // Update conversation list to refresh last message
+          loadConversations();
+        } else {
+          toast.error(response.message || "Failed to delete message");
+        }
       } catch (error) {
-        toast.error("Failed to delete message");
+        console.error("Delete message error:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to delete message",
+        );
+      } finally {
+        setSending(false);
+        setShowMessageActions(null);
       }
     },
-    [apiCall, activeChat],
+    [apiCall, activeChat, messages, loadConversations],
   );
 
   // ============ ADD REACTION ============
@@ -957,8 +1025,8 @@ export default function MessagesPage() {
   ];
   return (
     <>
-    <AnnouncementBar/>
-              <Header />
+      <AnnouncementBar />
+      <Header />
       <div
         className={`min-h-screen ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}
       >
@@ -1387,13 +1455,13 @@ export default function MessagesPage() {
                                   </button>
                                   <button
                                     onClick={() => {
-                                      deleteMessage(item.id || item._id, true);
+                                      deleteMessage(item.id || item._id, false);
                                       setShowMessageActions(null);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    disabled={isDeleting || sending}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50"
                                   >
-                                    <Trash2 className="h-4 w-4" /> Delete for
-                                    everyone
+                                    <Trash2 className="h-4 w-4" /> Delete for me
                                   </button>
                                 </>
                               )}
@@ -1715,7 +1783,7 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
-        <Footer />
+      <Footer />
     </>
   );
 }
